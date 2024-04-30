@@ -1,0 +1,65 @@
+require import AllCore Distr List.
+require import RealExp.
+require import RealSeries.
+require import StdBigop.
+import Bigreal Bigreal.BRA.
+
+(* -- uninteresting helper lemma: geometric series converges -- *)
+
+op geometric (r : real) (i : int) = if i < 0 then 0%r else r ^ i.
+
+lemma ge0_geo r i : 0%r <= r => 0%r <= geometric r i.
+proof.
+move => ge0_r.
+case (i < 0) => [|ge0_i]; first smt().
+by rewrite /geometric ge0_i /= StdOrder.RealOrder.expr_ge0.
+qed.
+
+lemma ge0_big_geo F r S:
+  0%r <= r =>
+  0%r <= big F (geometric r) S.
+proof.
+move => ?.
+apply (big_ind (fun x => 0%r <= x)); smt(ge0_geo).
+qed.
+
+lemma bigi_geoE r n :
+  0 < n =>
+  r <> 1%r =>
+  bigi predT (geometric r) 0 n = (1%r - r ^ n) / (1%r - r).
+proof.
+move => gt0_n ne1_r.
+rewrite (RField.eqr_div (bigi predT (geometric r) 0 n) 1%r) //=.
+- smt().
+rewrite RField.mulrDr RField.mulrN /=.
+rewrite mulr_suml /=.
+rewrite (big_int_recl (n - 1)) /=; first smt().
+have ->: geometric r 0 = 1%r.
+- by rewrite /geometric /= RField.expr0.
+rewrite (big_int_recr (n - 1)) /=; first smt().
+have ->: geometric r (n - 1) * r = r ^ n by smt(RField.exprS).
+smt(eq_big_int RField.exprS).
+qed.
+
+(* It is in fact possible to strengthen this and deal with -1 <= r < 0 too.
+ * Too much headache involved however. *)
+lemma geometric_ge0_summable r :
+  (0%r <= r < 1%r) =>
+  summable (geometric r).
+proof.
+move => [ge0_r lt1_r].
+exists (1%r / (1%r - r)) => J uniq_J.
+print big_filter.
+print bigEM.
+admitted.
+
+(* Discrete Gaussian over integers with expected value 0 *)
+
+(* un-normalized Gaussian *)
+op gaussian(s: real, x: int) : real = exp (- (x%r / s) ^ 2 / 2%r).
+
+lemma summable_gaussian s :
+  summable (gaussian s).
+proof.
+search summable.
+print pos.
