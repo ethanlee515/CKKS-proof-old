@@ -24,13 +24,16 @@ apply (big_ind (fun x => 0%r <= x)); smt(ge0_geo).
 qed.
 
 lemma bigi_geoE r n :
-  0 < n =>
+  0 <= n =>
   r <> 1%r =>
   bigi predT (geometric r) 0 n = (1%r - r ^ n) / (1%r - r).
 proof.
-move => gt0_n ne1_r.
-rewrite (RField.eqr_div (bigi predT (geometric r) 0 n) 1%r) //=.
-- smt().
+move => ge0_n ne1_r.
+case (0 < n); last first => [eq0_n|gt0_n].
+- have ->: n = 0 by smt().
+  rewrite RField.expr0 /=.
+  exact big_geq.
+rewrite (RField.eqr_div (bigi predT (geometric r) 0 n) 1%r) => [//|/#|/=].
 rewrite RField.mulrDr RField.mulrN /=.
 rewrite mulr_suml /=.
 rewrite (big_int_recl (n - 1)) /=; first smt().
@@ -41,7 +44,51 @@ have ->: geometric r (n - 1) * r = r ^ n by smt(RField.exprS).
 smt(eq_big_int RField.exprS).
 qed.
 
-(* It is in fact possible to strengthen this and deal with -1 <= r < 0 too.
+lemma filter_subset (xs ys: 'a list) :
+  uniq xs => uniq ys =>
+  mem xs <= mem ys =>
+  perm_eq xs (filter (mem xs) ys).
+proof.
+move => uniq_xs uniq_ys is_subset.
+apply uniq_perm_eq => // [|x].
+- exact filter_uniq.
+by rewrite mem_filter => /#.
+qed.
+
+(* complement of s in range(max(s)) *)
+op compl (s: int list) = filter (predC (mem s)) (range 0 (listmax Int.(<=) 0 s + 1)).
+
+lemma subset_range (xs : int list) (n : int) :
+  uniq xs =>
+  all (fun x => 0 <= x) xs =>
+  all (fun x => x < n) xs =>
+  mem xs <= mem (range 0 n).
+proof. smt(mem_range allP). qed.
+
+lemma split_range s :
+  uniq s =>
+  all (fun x => 0 <= x) s =>
+  perm_eq (range 0 (listmax Int.(<=) 0 s + 1)) (s ++ compl s).
+proof.
+move => uniq_s ge0_s.
+rewrite perm_eq_sym.
+pose rg := range 0 (listmax Int.(<=) 0 s + 1).
+pose p := mem s.
+apply (perm_eq_trans (filter (mem s) rg ++ compl s)); last first.
+- exact perm_filterC.
+apply perm_cat2r.
+apply filter_subset => //; first exact range_uniq.
+apply subset_range => //.
+apply allP => //= x mem_x.
+suff: x <= listmax Int.(<=) 0 s.
+- pose n := listmax Int.(<=) 0 s.
+  smt().
+apply listmax_gt_in => /#.
+qed.
+
+op geq0 x = (0 <= x).
+
+(* It is possible to strengthen this and deal with -1 <= r < 0 too.
  * Too much headache involved however. *)
 lemma geometric_ge0_summable r :
   (0%r <= r < 1%r) =>
@@ -49,9 +96,43 @@ lemma geometric_ge0_summable r :
 proof.
 move => [ge0_r lt1_r].
 exists (1%r / (1%r - r)) => J uniq_J.
-print big_filter.
-print bigEM.
-admitted.
+have ->: (fun i => `|geometric r i|) = (fun i => geometric r i).
+- apply fun_ext => i.
+  smt(ge0_geo).
+rewrite (eq_big_perm _ _ _ (filter geq0 J ++ filter (predC geq0) J)).
+- by rewrite perm_eq_sym perm_filterC.
+rewrite big_cat.
+have -> /=: big predT (geometric r) (filter (predC geq0) J) = 0%r.
+- clear uniq_J.
+  elim J => [|head tail iH].
+  + exact big_nil.
+  rewrite filter_cons.
+  case (predC geq0 head) => //= ?.
+  by rewrite big_consT /#.
+pose J_pos := filter geq0 J.
+have uniq_J_pos : uniq J_pos.
+- exact filter_uniq.
+apply (StdOrder.RealOrder.ler_trans
+  (bigi predT (fun i => geometric r i) 0 (listmax Int.(<=) 0 J_pos + 1))).
+- rewrite (eq_big_perm _ _ (range _ _) (J_pos ++ compl J_pos)) /=.
+  + apply split_range => //.
+    apply allP => /= x mem_x.
+    smt(mem_filter).
+  rewrite big_cat.
+  smt(ge0_big_geo).
+rewrite bigi_geoE; 2: smt().
+- suff: 0 <= listmax Int.(<=) 0 J_pos.
+  + pose m := listmax Int.(<=) 0 J_pos.
+    smt().
+  case (J_pos = []) => [/#|J_pos_not_nil].
+  apply (StdOrder.IntOrder.ler_trans (head 0 J_pos)).
+  + have H: (head 0 J_pos) \in J_pos by smt().
+    smt(mem_filter).
+  by apply listmax_gt_in => /#.
+pose x := r ^ (listmax Int.(<=) 0 J_pos + 1).
+suff: 0%r <= x by smt().
+exact StdOrder.RealOrder.expr_ge0.
+qed.
 
 (* Discrete Gaussian over integers with expected value 0 *)
 
