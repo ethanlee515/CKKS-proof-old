@@ -90,13 +90,13 @@ op geq0 x = (0 <= x).
 
 (* It is possible to strengthen this and deal with -1 <= r < 0 too.
  * Too much headache involved however. *)
-lemma geometric_ge0_summable r :
+lemma summable_geometric r :
   (0%r <= r < 1%r) =>
   summable (geometric r).
 proof.
 move => [ge0_r lt1_r].
 exists (1%r / (1%r - r)) => J uniq_J.
-have ->: (fun i => `|geometric r i|) = (fun i => geometric r i).
+have ->: (fun i => `|geometric r i|) = (geometric r).
 - apply fun_ext => i.
   smt(ge0_geo).
 rewrite (eq_big_perm _ _ _ (filter geq0 J ++ filter (predC geq0) J)).
@@ -124,7 +124,7 @@ rewrite bigi_geoE; 2: smt().
 - suff: 0 <= listmax Int.(<=) 0 J_pos.
   + pose m := listmax Int.(<=) 0 J_pos.
     smt().
-  case (J_pos = []) => [/#|J_pos_not_nil].
+  case (J_pos = []) => [/#|?].
   apply (StdOrder.IntOrder.ler_trans (head 0 J_pos)).
   + have H: (head 0 J_pos) \in J_pos by smt().
     smt(mem_filter).
@@ -137,10 +137,61 @@ qed.
 (* Discrete Gaussian over integers with expected value 0 *)
 
 (* un-normalized Gaussian *)
-op gaussian(s: real, x: int) : real = exp (- (x%r / s) ^ 2 / 2%r).
+op gaussian s x : real = exp (- (x%r / s) ^ 2 / 2%r).
+
+lemma even_gaussian s x :
+  gaussian s x = gaussian s (-x).
+proof. smt(RField.sqrrN). qed.
+
+op gauss_geo s = exp (- (1%r / s) ^ 2 / 2%r).
+
+lemma le_gaussian_geometric s x :
+  0%r < s =>
+  0 <= x =>
+  gaussian s x <= geometric (gauss_geo s) x.
+proof.
+move => gt0_s ge0_x.
+apply (intind (fun x => gaussian s x <= geometric (gauss_geo s) x)) => //=.
+- rewrite /gaussian /geometric /gauss_geo /=.
+  rewrite RField.expr0.
+  smt(RField.expr2 exp0).
+clear ge0_x x.
+move => x ge0_x iH.
+apply (StdOrder.RealOrder.ler_trans (gauss_geo s * gaussian s x)).
+- rewrite /gaussian /gauss_geo.
+  rewrite -expD.
+  apply exp_mono.
+  rewrite !RField.expr2 /#.
+apply (StdOrder.RealOrder.ler_trans (gauss_geo s * geometric (gauss_geo s) x)).
+- apply StdOrder.RealOrder.ler_pmul2l => //.
+  exact exp_gt0.
+smt(RField.exprS).
+qed.
 
 lemma summable_gaussian s :
+  0%r < s =>
   summable (gaussian s).
 proof.
-search summable.
-print pos.
+move => gt0_s.
+pose k := exp (- (1%r / s) ^ 2 / 2%r).
+apply (summable_le (fun x => (geometric k x + geometric k (-x)))) => [|x /=].
+- have ?: summable (geometric k).
+  + apply summable_geometric.
+    split => [|_]; first smt(exp_gt0).
+    by rewrite -exp0 exp_mono_ltr RField.expr2 /#.
+  apply summableD => //. 
+  by apply (summable_inj (fun (x: int) => -x) (geometric k)) => /#.
+case (0 < x) => [gt0_x|le0_x].
+- have -> /=: geometric k (-x) = 0%r by smt().
+  rewrite /"`|_|".
+  have -> /=: 0%r <= gaussian s x by smt(exp_gt0).
+  have -> /=: 0%r <= geometric k x by smt(ge0_geo exp_gt0).
+  apply le_gaussian_geometric => /#.
+case (x = 0) => [|lt0_x]; first smt(RField.expr2 RField.expr0 exp0).
+have -> /=: geometric k x = 0%r by smt().
+rewrite /"`|_|".
+have -> /=: 0%r <= gaussian s x by smt(exp_gt0).
+have -> /=: 0%r <= geometric k (-x) by smt(ge0_geo exp_gt0).
+rewrite even_gaussian.
+apply le_gaussian_geometric => /#.
+qed.
