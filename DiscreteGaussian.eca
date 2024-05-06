@@ -195,3 +195,61 @@ have -> /=: 0%r <= geometric k (-x) by smt(ge0_geo exp_gt0).
 rewrite even_gaussian.
 apply le_gaussian_geometric => /#.
 qed.
+
+lemma gt0_sum_gaussian s :
+  0%r < s =>
+  0%r < sum (gaussian s).
+proof.
+move => gt0_s.
+rewrite (sumD1 (gaussian s) 0); first exact summable_gaussian.
+suff: 0%r < gaussian s 0 /\ 0%r <= sum (fun x => if x <> 0 then gaussian s x else 0%r).
+- smt().
+split; first exact exp_gt0.
+apply ge0_sum; smt(exp_gt0).
+qed.
+
+op discrete_gaussian_pdf s x = gaussian s x / sum (gaussian s).
+
+lemma isdistr_discrete_gaussian s :
+  0%r < s =>
+  isdistr (discrete_gaussian_pdf s).
+proof.
+move => gt0_s.
+split => [x|J uniq_J]; first smt(gt0_sum_gaussian exp_gt0).
+rewrite /discrete_gaussian_pdf -mulr_suml.
+have ->: (fun i => gaussian s i) = gaussian s by trivial.
+suff: big predT (gaussian s) J <= sum (gaussian s).
+- move => ?.
+  apply StdOrder.RealOrder.ler_pdivr_mulr => //.
+  exact gt0_sum_gaussian.
+apply ler_big_sum; smt(exp_gt0 summable_gaussian).
+qed.
+
+op discrete_gaussian s = mk (discrete_gaussian_pdf s).
+
+lemma discrete_gaussian1E s x :
+  0%r < s =>
+  mu1 (discrete_gaussian s) x = discrete_gaussian_pdf s x.
+proof. smt(muK' isdistr_discrete_gaussian). qed.
+
+lemma discrete_gaussian_ll s :
+  0%r < s =>
+  is_lossless (discrete_gaussian s).
+proof.
+move => gt0_s.
+rewrite /is_lossless weightE.
+have ->: mu1 (discrete_gaussian s) = discrete_gaussian_pdf s.
+- apply fun_ext => ?.
+  exact discrete_gaussian1E.
+rewrite sumZr; smt(gt0_sum_gaussian).
+qed.
+
+lemma discrete_gaussian_fu s :
+  0%r < s =>
+  is_full (discrete_gaussian s).
+proof.
+move => gt0_s x.
+apply supportP.
+rewrite discrete_gaussian1E //.
+smt(exp_gt0 gt0_sum_gaussian).
+qed.
