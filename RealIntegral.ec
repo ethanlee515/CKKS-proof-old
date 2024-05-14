@@ -89,7 +89,7 @@ op glb xs = - (lub (xs \o Real.([ - ]))).
 
 op upper_integral f x0 x1 = glb (is_upper_sum f x0 x1).
 
-op integrable f x0 x1 = (integral f x0 x1 = upper_integral f x0 x1).
+op integrable f = forall x0 x1, (integral f x0 x1 = upper_integral f x0 x1).
 
 op differential (f : real -> real) (x dx : real) = (f (x + dx) - f x) / dx.
 
@@ -106,14 +106,36 @@ lemma integral_split f (x1 x0 x2 : real) :
   integral f x0 x2 = integral f x0 x1 + integral f x1 x2.
 proof. admitted.
 
-lemma integral_lb f x0 x1 :
-  flub_in f x0 x1 * (x1 - x0) <= integral f x0 x1.
-proof. admitted.
-
 op fglb_in f x0 x1 = - (flub_in (f \o Real.([ - ])) x0 x1).
 
+lemma continuous_flub_fglb (f : real -> real) (x eps : real) :
+  continuous_at f x =>
+  exists dx,
+  0%r < dx /\
+  flub_in f (x - dx) (x + dx) < (f x + eps) /\
+  fglb_in f (x - dx) (x + dx) > f x - eps.
+proof. admitted.
+
+lemma flub_in_subset f (x0 x1 x0' x1' : real) :
+  x0 <= x0' =>
+  x1' <= x1 =>
+  x0' <= x1' =>
+  flub_in f x0' x1' <= flub_in f x0 x1.
+proof. admitted.
+
+lemma fglb_in_subset f (x0 x1 x0' x1' : real) :
+  x0 <= x0' =>
+  x1' <= x1 =>
+  x0' <= x1' =>
+  fglb_in f x0 x1 <= fglb_in f x0' x1'.
+proof. admitted.
+
 lemma integral_ub f x0 x1 :
-  integral f x0 x1 <= fglb_in f x0 x1 * (x1 - x0).
+  integral f x0 x1 <= flub_in f x0 x1 * (x1 - x0).
+proof. admitted.
+
+lemma integral_lb f x0 x1 :
+  fglb_in f x0 x1 * (x1 - x0) <= integral f x0 x1.
 proof. admitted.
 
 lemma fundamental_theorem_of_calculus (f : real -> real) (x x0 : real) :
@@ -127,31 +149,28 @@ suff: is_lim (differential (integral f x0) x) 0%r (f x).
 - smt(lim_unique choicebP).
 move => dy gt0_dy /=.
 pose dy' := minr dy 0.5.
-have [dx0 [gt0_dx0 ?]]:
-  exists dx, 0%r < dx /\ forall x', x' <> x => `|x' - x| < dx => `|f x' - f x| < maxr `|f x| dy'.
-- have H: is_lim f x (f x).
-  + smt(lim_unique choicebP).
-  by apply H => /#.
-clear continuous_f.
+apply (continuous_flub_fglb f x dy') in continuous_f.
+case continuous_f => [dx0 [gt0_dx0 [ub_f lb_f]]].
 pose dx1 := dy' / (2%r * `|f x| + dy').
 pose dx2 := x - x0.
 exists (minr dx0 (minr dx1 dx2)).
 split => [/#| h ne0_h small_h].
 rewrite /differential.
-pose xL := minr x (x + h).
-pose xR := maxr x (x + h).
 case (0%r < h) => [gt0_h|le0_h].
 - rewrite (integral_split f x); 1,2:smt().
   have ->: integral f x0 x + integral f x (x + h) - integral f x0 x = integral f x (x + h) by smt().
-  rewrite /"`|_|".
-  case (0%r <= integral f x (x + h) / h - f x) => _ /=.
-  + apply (ler_lt_trans (fglb_in f x (x + h) - f x)).
-    * smt(ler_pdivr_mulr integral_ub).
-    admit.
-  + apply (ler_lt_trans (- flub_in f x (x + h) + f x)).
-    * smt(ler_pdivl_mulr integral_lb).
-    admit.
+  case (0%r <= integral f x (x + h) / h - f x).
+  + smt(ler_pdivr_mulr integral_ub flub_in_subset).
+  + smt(ler_pdivl_mulr integral_lb fglb_in_subset).
 - rewrite (integral_split f (x + h) x0 x); 1,2:smt().
   have -> /=: integral f x0 (x + h) - (integral f x0 (x + h) + integral f (x + h) x) = - integral f (x + h) x by smt().
-  admit.
+  case (0%r <= (- integral f (x + h) x) / h - f x).
+  + suff: (- integral f (x + h) x) / h - f x < dy by smt().
+    apply (ler_lt_trans (flub_in f (x + h) x - f x)); last smt(flub_in_subset).
+    suff: (- integral f (x + h) x) / h <= (flub_in f (x + h) x) by smt().
+    by apply ler_ndivr_mulr; smt(integral_ub).
+  + suff: integral f (x + h) x / h + f x < dy by smt().
+    apply (ler_lt_trans (- fglb_in f (x + h) x + f x)); last smt(fglb_in_subset).
+    suff: integral f (x + h) x / h <= - fglb_in f (x + h) x by smt().
+    apply ler_ndivr_mulr; smt(integral_lb).
 qed.
