@@ -9,6 +9,22 @@ require import RealFLub.
 
 op flub_in (f : real -> real) x0 x1 = flub (fun x => f x * b2r (x0 <= x /\ x <= x1)).
 
+op fglb_in f x0 x1 = - (flub_in (f \o Real.([ - ])) x0 x1).
+
+lemma flub_in_subset f (x0 x1 x0' x1' : real) :
+  x0 <= x0' =>
+  x1' <= x1 =>
+  x0' <= x1' =>
+  flub_in f x0' x1' <= flub_in f x0 x1.
+proof. admitted.
+
+lemma fglb_in_subset f (x0 x1 x0' x1' : real) :
+  x0 <= x0' =>
+  x1' <= x1 =>
+  x0' <= x1' =>
+  fglb_in f x0 x1 <= fglb_in f x0' x1'.
+proof. admitted.
+
 (* standard delta-epsilon definition of a limit *)
 op is_lim (f : real -> real) (x y : real) =
   forall dy, 0%r < dy =>
@@ -38,15 +54,20 @@ op lim f x = choiceb (is_lim f x) 0%r.
 op continuous_at f x = (lim_exists f x /\ lim f x = f x).
 op continuous f = forall x, continuous_at f x.
 
+lemma continuous_flub_fglb (f : real -> real) (x eps : real) :
+  continuous_at f x =>
+  exists dx,
+  0%r < dx /\
+  flub_in f (x - dx) (x + dx) < (f x + eps) /\
+  fglb_in f (x - dx) (x + dx) > f x - eps.
+proof. admitted.
+
 op lower_sum f xs =
   bigi predT
   (fun i =>
     let x0 = nth 0%r xs i in
     let x1 = nth 0%r xs (i + 1) in
-    let y0 = f x0 in
-    let y1 = f x1 in
-    let y = minr y0 y1 in
-    y * (x1 - x0))
+    fglb_in f x0 x1 * (x1 - x0))
   0 (size xs - 1).
 
 op is_lower_sum f x0 x1 y =
@@ -70,10 +91,7 @@ op upper_sum f xs =
   (fun i =>
     let x0 = nth 0%r xs i in
     let x1 = nth 0%r xs (i + 1) in
-    let y0 = f x0 in
-    let y1 = f x1 in
-    let y = maxr y0 y1 in
-    y * (x1 - x0))
+    flub_in f x0 x1 * (x1 - x0))
   0 (size xs - 1).
 
 op is_upper_sum f x0 x1 y =
@@ -104,30 +122,6 @@ proof. admitted.
 lemma integral_split f (x1 x0 x2 : real) :
   x0 <= x1 => x1 <= x2 =>
   integral f x0 x2 = integral f x0 x1 + integral f x1 x2.
-proof. admitted.
-
-op fglb_in f x0 x1 = - (flub_in (f \o Real.([ - ])) x0 x1).
-
-lemma continuous_flub_fglb (f : real -> real) (x eps : real) :
-  continuous_at f x =>
-  exists dx,
-  0%r < dx /\
-  flub_in f (x - dx) (x + dx) < (f x + eps) /\
-  fglb_in f (x - dx) (x + dx) > f x - eps.
-proof. admitted.
-
-lemma flub_in_subset f (x0 x1 x0' x1' : real) :
-  x0 <= x0' =>
-  x1' <= x1 =>
-  x0' <= x1' =>
-  flub_in f x0' x1' <= flub_in f x0 x1.
-proof. admitted.
-
-lemma fglb_in_subset f (x0 x1 x0' x1' : real) :
-  x0 <= x0' =>
-  x1' <= x1 =>
-  x0' <= x1' =>
-  fglb_in f x0 x1 <= fglb_in f x0' x1'.
 proof. admitted.
 
 lemma integral_ub f x0 x1 :
