@@ -35,6 +35,12 @@ lemma has_flb_in_subset (f : real -> real) (x0 x0' x1 x1' : real) :
   has_flb_in f x0' x1'.
 proof. admitted.
 
+lemma has_flb_in_ge (f g : real -> real) (x0 x1 : real) :
+  has_flb_in f x0 x1 =>
+  (forall x, x0 <= x => x <= x1 => f x <= g x) =>
+  has_flb_in g x0 x1.
+proof. admitted.
+
 lemma ler_fglb_in f g x0 x1 :
   has_flb_in f x0 x1 =>
   (forall x, x0 <= x => x <= x1 => f x <= g x) =>
@@ -102,6 +108,18 @@ lemma continuous_flub_fglb (f : real -> real) (x eps : real) :
   0%r < dx /\
   flub_in f (x - dx) (x + dx) < (f x + eps) /\
   fglb_in f (x - dx) (x + dx) > f x - eps.
+proof. admitted.
+
+print has_fub_in.
+
+lemma continuous_has_fub_in f x0 x1 :
+  continuous f =>
+  has_fub_in f x0 x1.
+proof. admitted.
+
+lemma continuous_has_flb_in f x0 x1 :
+  continuous f =>
+  has_flb_in f x0 x1.
 proof. admitted.
 
 op is_partition xs (x0 x1 : real) =
@@ -332,10 +350,10 @@ lemma split_intervals_nomem xs x0 x1 x :
   make_intervals lst1 ++ [(last 0%r lst1, head 0%r lst2)] ++ make_intervals lst2.
 proof. admitted.
 
-(* TODO maybe need lower bound to exist? *)
 lemma lower_sum_ith_split f (x0 x1 x2 : real) :
   x0 < x1 =>
   x1 < x2 =>
+  has_flb_in f x0 x2 =>
   lower_sum_ith f (x0, x2) <=
   lower_sum_ith f (x0, x1) + lower_sum_ith f (x1, x2).
 proof. admitted.
@@ -344,9 +362,10 @@ lemma split_lower_sum x f xs x0 x1 :
   is_partition xs x0 x1 =>
   x0 < x =>
   x < x1 =>
+  has_flb_in f x0 x1 =>
   lower_sum f xs <= lower_sum f (split_partition_to xs x) + lower_sum f (split_partition_from xs x).
 proof.
-move => is_partition_xs lb_x ub_x.
+move => is_partition_xs lb_x ub_x has_flb_f.
 rewrite -big_cat.
 case (x \in xs) => [mem_x | not_mem_x].
 - by rewrite /lower_sum -(cat_split_intervals_mem xs x0 x1 x).
@@ -356,10 +375,14 @@ rewrite !big_cat.
 have H: forall (a b b' c : real), b <= b' => a + b + c <= a + b' + c by smt().
 apply H; clear H.
 rewrite !big_cons !big_nil /predT /=.
-(* apply lower_sum_ith_split...? *)
-admitted.
+apply lower_sum_ith_split.
+- admit.
+- admit.
+- admit.
+qed.
 
 lemma has_lub_lower_sum f x0 x1 :
+  has_flb_in f x0 x1 =>
   has_lub (is_lower_sum f x0 x1).
 proof.
 print has_lub.
@@ -419,8 +442,8 @@ lemma integral_le (f1 f2 : real -> real) (x0 x1 : real) :
   (forall x, x0 <= x => x <= x1 => f1 x <= f2 x) =>
   integral f1 x0 x1 <= integral f2 x0 x1.
 proof.
-move => le_f1_f2 has_flb_f1.
-apply ler_lub; 2,3:smt(has_lub_lower_sum).
+move => has_flb_f1 le_f1_f2.
+apply ler_lub; 2,3:smt(has_lub_lower_sum has_flb_in_ge).
 move => s is_lower_sum_s.
 case is_lower_sum_s => [xs [??]].
 exists (lower_sum f2 xs).
@@ -460,9 +483,10 @@ op differentiable_at f x = lim_exists (differential f x) 0%r.
 
 lemma integral_split_le f (x1 x0 x2 : real) :
   x0 < x1 => x1 < x2 =>
+  has_flb_in f x0 x2 =>
   integral f x0 x2 <= integral f x0 x1 + integral f x1 x2.
 proof.
-move => le_x0_x1 le_x1_x2.
+move => le_x0_x1 le_x1_x2 has_flb_f.
 apply lub_le_ub; first exact has_lub_lower_sum.
 move => s is_lower_sum_s.
 case is_lower_sum_s => xs [is_partition_xs is_sum_xs].
@@ -516,21 +540,26 @@ qed.
 
 lemma integral_split_ge f (x1 x0 x2 : real) :
   x0 < x1 => x1 < x2 =>
+  has_flb_in f x0 x2 =>
   integral f x0 x2 >= integral f x0 x1 + integral f x1 x2.
 proof.
-move => lt_x0_x1 lt_x1_x2.
-apply ler_sum_lub; 1,2,3: smt(has_lub_lower_sum).
+move => lt_x0_x1 lt_x1_x2 has_flb_f.
+apply ler_sum_lub.
+- exists (lower_sum f [x0; x1]) => /#.
+- smt(has_lub_lower_sum has_flb_in_subset).
+- exact has_lub_lower_sum.
 smt(is_lower_sum_cat).
 qed.
 
 lemma integral_split f (x1 x0 x2 : real) :
   x0 < x1 => x1 < x2 =>
+  has_flb_in f x0 x2 =>
   integral f x0 x2 = integral f x0 x1 + integral f x1 x2.
 proof. smt(integral_split_le integral_split_ge). qed.
 
 lemma fundamental_theorem_of_calculus (f : real -> real) (x x0 : real) :
   x0 < x =>
-  continuous_at f x =>
+  continuous f =>
   differentiable_at (integral f x0) x /\
   derive (integral f x0) x = f x.
 proof.
@@ -539,22 +568,23 @@ suff: is_lim (differential (integral f x0) x) 0%r (f x).
 - smt(lim_unique choicebP).
 move => dy gt0_dy /=.
 pose dy' := minr dy 0.5.
-apply (continuous_flub_fglb f x dy') in continuous_f.
-case continuous_f => [dx0 [gt0_dx0 [ub_f lb_f]]].
+have H: continuous_at f x by smt().
+apply (continuous_flub_fglb f x dy') in H.
+case H => [dx0 [gt0_dx0 [ub_f lb_f]]].
 pose dx1 := dy' / (2%r * `|f x| + dy').
 pose dx2 := x - x0.
 exists (minr dx0 (minr dx1 dx2)).
 split => [/#| h ne0_h small_h].
 rewrite /differential.
 case (0%r < h) => [gt0_h|le0_h].
-- rewrite (integral_split f x); 1,2:smt().
+- rewrite (integral_split f x); 1,2,3: smt(continuous_has_flb_in).
   have ->: integral f x0 x + integral f x (x + h) - integral f x0 x = integral f x (x + h) by smt().
   case (0%r <= integral f x (x + h) / h - f x); admit.
   (* broken due to added flb assumption... *)
   (*
   + smt(ler_pdivr_mulr integral_ub flub_in_subset).
   + smt(ler_pdivl_mulr integral_lb fglb_in_subset). *)
-- rewrite (integral_split f (x + h) x0 x); 1,2:smt().
+- rewrite (integral_split f (x + h) x0 x); 1,2,3:smt(continuous_has_flb_in).
   have -> /=: integral f x0 (x + h) - (integral f x0 (x + h) + integral f (x + h) x) = - integral f (x + h) x by smt().
   case (0%r <= (- integral f (x + h) x) / h - f x).
   + suff: (- integral f (x + h) x) / h - f x < dy by smt().
