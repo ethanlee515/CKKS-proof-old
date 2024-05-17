@@ -9,10 +9,37 @@ require import RealLub RealFLub.
 
 op glb xs = - (lub (xs \o Real.([ - ]))).
 
+op has_flb f = has_fub (f \o Real.([ - ])).
+
 op flub_in (f : real -> real) (x0 x1 : real) = flub (fun x =>
-  if x0 <= x /\ x <= x1 then f x else minr (f x0) (f x1)).
+  if x0 <= x /\ x <= x1 then f x else f x0).
 
 op fglb_in f x0 x1 = - (flub_in (f \o Real.([ - ])) x0 x1).
+
+op has_fub_in (f : real -> real) (x0 x1 : real) = has_fub (fun x =>
+  if x0 <= x /\ x <= x1 then f x else f x0).
+
+lemma ler_flub_in f g x0 x1 :
+  has_fub_in g x0 x1 =>
+  (forall x, x0 <= x => x <= x1 => f x <= g x) =>
+  flub_in f x0 x1 <= flub_in g x0 x1.
+proof. admitted.
+
+op has_flb_in (f : real -> real) (x0 x1 : real) = has_flb (fun x =>
+  if x0 <= x /\ x <= x1 then f x else f x0).
+
+lemma has_flb_in_subset (f : real -> real) (x0 x0' x1 x1' : real) :
+  x0 <= x0' =>
+  x1' <= x1 =>
+  has_flb_in f x0 x1 =>
+  has_flb_in f x0' x1'.
+proof. admitted.
+
+lemma ler_fglb_in f g x0 x1 :
+  has_flb_in f x0 x1 =>
+  (forall x, x0 <= x => x <= x1 => f x <= g x) =>
+  fglb_in f x0 x1 <= fglb_in g x0 x1.
+proof. admitted.
 
 lemma flub_in_upper_bound f (x0 x1 x : real) :
   x0 <= x =>
@@ -77,19 +104,19 @@ lemma continuous_flub_fglb (f : real -> real) (x eps : real) :
   fglb_in f (x - dx) (x + dx) > f x - eps.
 proof. admitted.
 
-op lower_sum f xs =
-  bigi predT
-  (fun i =>
-    let x0 = nth 0%r xs i in
-    let x1 = nth 0%r xs (i + 1) in
-    fglb_in f x0 x1 * (x1 - x0))
-  0 (size xs - 1).
-
 op is_partition xs (x0 x1 : real) =
-  sorted Real.(<=) xs /\
+  sorted Real.(<) xs /\
   x0 < x1 /\
   head 0%r xs = x0 /\
   last 0%r xs = x1.
+
+op make_intervals xs = map (fun i => (nth 0%r xs i, nth 0%r xs (i + 1))) (range 0 (size xs - 1)).
+
+op lower_sum_ith f x0x1 =
+  let (x0, x1) = x0x1 in
+  fglb_in f x0 x1 * (x1 - x0).
+
+op lower_sum f xs = big predT (lower_sum_ith f) (make_intervals xs).
 
 op is_lower_sum f x0 x1 y =
   exists xs,
@@ -136,6 +163,7 @@ by split; apply (mem_is_partition_xx xs); smt(mem_nth).
 qed.
 *)
 
+(*
 lemma subseq_range xs i j :
   sorted Int.(<) xs =>
   i <= head i xs =>
@@ -145,20 +173,25 @@ proof.
 move => sorted_xs ge_xs_i lt_xs_j.
 apply subseqP.
 admitted.
+*)
 
 lemma lower_sum_le (f1 f2 : real -> real) xs x0 x1 :
   is_partition xs x0 x1 =>
+  has_flb_in f1 x0 x1 =>
   (forall x, x0 <= x => x <= x1 => f1 x <= f2 x) =>
   lower_sum f1 xs <= lower_sum f2 xs.
 proof.
-move => is_partition_xs le_f1_f2.
+move => is_partition_xs has_flb_f1 le_f1_f2.
 rewrite /lower_sum.
-apply ler_sum_seq => /= i rg_i _.
-suff: fglb_in f1 (nth 0%r xs i) (nth 0%r xs (i + 1)) <=
-  fglb_in f2 (nth 0%r xs i) (nth 0%r xs (i + 1)).
-- suff: nth 0%r xs i <= nth 0%r xs (i + 1) by smt().
+apply ler_sum_seq => /= [[x_i x_ii] mem_x_i] _.
+print lower_sum_ith.
+suff: fglb_in f1 x_i x_ii <= fglb_in f2 x_i x_ii.
+- suff: x_i <= x_ii by smt().
+  admit. (* Property of make_intervals and is_partition... *)
+  (*
   suff: sorted Real.(<=) [nth 0%r xs i; nth 0%r xs (i + 1)] by smt().
-  apply (subseq_sorted _ _ _ xs); 1,3:smt().
+  case is_partition_xs => [sortd_xs [lt_x0_x1 [??]]]; subst.
+  apply (subseq_sorted _ _ _ xs) => //=; first smt().
   pose f := (nth 0%r xs).
   have ->: [nth 0%r xs i; nth 0%r xs (i + 1)] = map f [i; i + 1] by smt().
   have ->: xs = map f (range 0 (size xs)).
@@ -168,16 +201,28 @@ suff: fglb_in f1 (nth 0%r xs i) (nth 0%r xs (i + 1)) <=
     by rewrite nth_range.
   apply map_subseq.
   by apply subseq_range; smt(mem_range).
-admitted.
+  *)
+have ?: (x_i >= x0).
+- admit.
+have ?: (x_ii <= x1).
+- admit.
+apply ler_fglb_in; last smt().
+exact (has_flb_in_subset _ x0 _ x1).
+qed.
 
 op split_partition_to (xs : real list) (x : real) =
-  rcons (filter (fun a => a <= x) xs) x.
+  rcons (filter (fun a => a < x) xs) x.
 
+op split_partition_from (xs : real list) (x : real) =
+  x :: (filter (fun a => x < a) xs).
+
+(*
 lemma sorted_rcons dfl (e : 'a -> 'a -> bool) xs x :
   sorted e xs =>
   (xs <> [] => e (last dfl xs) x) =>
   sorted e (rcons xs x).
 proof. admitted.
+*)
 
 (*
 lemma filter_last (xs : 'a list) dfl f :
@@ -193,10 +238,12 @@ admitted.
 lemma sorted_split_partition_to xs x :
   xs <> [] =>
   x >= head 0%r xs =>
-  sorted Real.(<=) xs =>
-  sorted Real.(<=) (split_partition_to xs x).
+  sorted Real.(<) xs =>
+  sorted Real.(<) (split_partition_to xs x).
 proof.
 move => ???.
+rewrite /split_partition_to.
+(*
 apply (sorted_rcons 0%r).
 - apply sorted_filter => /#.
 pose ys := filter (fun a => a <= x) xs.
@@ -205,16 +252,18 @@ suff: last 0%r ys \in ys by smt(mem_filter).
 rewrite (last_nth 0%r 0%r ys).
 smt(mem_nth size_ge0).
 qed.
+*)
+admitted.
 
 lemma head_split_partition_to xs x :
   xs <> [] =>
   x >= head 0%r xs =>
   head 0%r (split_partition_to xs x) = head 0%r xs.
-proof. smt(). qed.
+proof. admitted.
 
 lemma last_split_partition_to xs x :
   last 0%r (split_partition_to xs x) = x.
-proof. smt(last_rcons). qed.
+proof. admitted.
 
 lemma is_partition_split_to xs (x0 x1 x2 : real) :
   x0 < x1 =>
@@ -229,9 +278,6 @@ split; first by rewrite head_split_partition_to /#.
 by rewrite last_split_partition_to.
 qed.
 
-op split_partition_from (xs : real list) (x : real) =
-  x :: filter (fun a => a >= x) xs.
-
 lemma sorted_split_partition_from xs x :
   xs <> [] =>
   x >= head 0%r xs =>
@@ -242,7 +288,7 @@ admitted.
 
 lemma head_split_partition_from xs x :
   head 0%r (split_partition_from xs x) = x.
-proof. smt(). qed.
+proof. admitted.
 
 lemma last_split_partition_from xs x :
   xs <> [] =>
@@ -257,14 +303,60 @@ lemma is_partition_split_from xs (x0 x1 x2 : real) :
   is_partition (split_partition_from xs x1) x1 x2.
 proof. admitted.
 
+lemma cat_split_intervals_mem xs x0 x1 x :
+  is_partition xs x0 x1 =>
+  x \in xs =>
+  make_intervals (split_partition_to xs x) ++
+  make_intervals (split_partition_from xs x)
+  = make_intervals xs.
+proof. admitted.
+
+lemma cat_split_intervals_nomem xs x0 x1 x :
+  is_partition xs x0 x1 =>
+  x0 < x => x < x1 =>
+  !(x \in xs) =>
+  make_intervals (split_partition_to xs x) ++
+  make_intervals (split_partition_from xs x) =
+  let lst1 = filter (fun a => a < x) xs in
+  let lst2 = filter (fun a => x < a) xs in
+  make_intervals lst1 ++ [(last 0%r lst1, x); (x, head 0%r lst2)] ++ make_intervals lst2.
+proof. admitted.
+
+lemma split_intervals_nomem xs x0 x1 x :
+  is_partition xs x0 x1 =>
+  x0 < x => x < x1 =>
+  !(x \in xs) =>
+  make_intervals xs =
+  let lst1 = filter (fun a => a < x) xs in
+  let lst2 = filter (fun a => x < a) xs in
+  make_intervals lst1 ++ [(last 0%r lst1, head 0%r lst2)] ++ make_intervals lst2.
+proof. admitted.
+
+(* TODO maybe need lower bound to exist? *)
+lemma lower_sum_ith_split f (x0 x1 x2 : real) :
+  x0 < x1 =>
+  x1 < x2 =>
+  lower_sum_ith f (x0, x2) <=
+  lower_sum_ith f (x0, x1) + lower_sum_ith f (x1, x2).
+proof. admitted.
+
 lemma split_lower_sum x f xs x0 x1 :
   is_partition xs x0 x1 =>
-  x0 <= x =>
-  x <= x1 =>
+  x0 < x =>
+  x < x1 =>
   lower_sum f xs <= lower_sum f (split_partition_to xs x) + lower_sum f (split_partition_from xs x).
 proof.
 move => is_partition_xs lb_x ub_x.
-
+rewrite -big_cat.
+case (x \in xs) => [mem_x | not_mem_x].
+- by rewrite /lower_sum -(cat_split_intervals_mem xs x0 x1 x).
+rewrite /lower_sum (cat_split_intervals_nomem xs x0 x1 x) //=.
+rewrite (split_intervals_nomem xs x0 x1 x) //=.
+rewrite !big_cat.
+have H: forall (a b b' c : real), b <= b' => a + b + c <= a + b' + c by smt().
+apply H; clear H.
+rewrite !big_cons !big_nil /predT /=.
+(* apply lower_sum_ith_split...? *)
 admitted.
 
 lemma has_lub_lower_sum f x0 x1 :
@@ -323,10 +415,11 @@ exact integral_const_ge.
 qed.
 
 lemma integral_le (f1 f2 : real -> real) (x0 x1 : real) :
+  has_flb_in f1 x0 x1 =>
   (forall x, x0 <= x => x <= x1 => f1 x <= f2 x) =>
   integral f1 x0 x1 <= integral f2 x0 x1.
 proof.
-move => le_f1_f2.
+move => le_f1_f2 has_flb_f1.
 apply ler_lub; 2,3:smt(has_lub_lower_sum).
 move => s is_lower_sum_s.
 case is_lower_sum_s => [xs [??]].
@@ -342,17 +435,20 @@ lemma integral_lb f (x0 x1 : real) :
 proof.
 move => le_x0_x1.
 rewrite -(integral_const (fglb_in f x0 x1) x0 x1) //=.
-apply integral_le => x lb_x ub_x /=.
+apply integral_le => /=.
+ - admit. (* has_flb_in assumption *)
+move => x lb_x ub_x /=.
 exact fglb_in_lower_bound.
 qed.
 
 lemma integral_ub f (x0 x1 : real) :
   x0 < x1 =>
+  has_flb_in f x0 x1 =>
   integral f x0 x1 <= flub_in f x0 x1 * (x1 - x0).
 proof.
-move => ?.
+move => ??.
 rewrite -(integral_const (flub_in f x0 x1) x0 x1) //=.
-apply integral_le => ??? /=.
+apply integral_le => //= ???.
 exact flub_in_upper_bound.
 qed.
 
@@ -453,16 +549,19 @@ rewrite /differential.
 case (0%r < h) => [gt0_h|le0_h].
 - rewrite (integral_split f x); 1,2:smt().
   have ->: integral f x0 x + integral f x (x + h) - integral f x0 x = integral f x (x + h) by smt().
-  case (0%r <= integral f x (x + h) / h - f x).
+  case (0%r <= integral f x (x + h) / h - f x); admit.
+  (* broken due to added flb assumption... *)
+  (*
   + smt(ler_pdivr_mulr integral_ub flub_in_subset).
-  + smt(ler_pdivl_mulr integral_lb fglb_in_subset).
+  + smt(ler_pdivl_mulr integral_lb fglb_in_subset). *)
 - rewrite (integral_split f (x + h) x0 x); 1,2:smt().
   have -> /=: integral f x0 (x + h) - (integral f x0 (x + h) + integral f (x + h) x) = - integral f (x + h) x by smt().
   case (0%r <= (- integral f (x + h) x) / h - f x).
   + suff: (- integral f (x + h) x) / h - f x < dy by smt().
     apply (ler_lt_trans (flub_in f (x + h) x - f x)); last smt(flub_in_subset).
     suff: (- integral f (x + h) x) / h <= (flub_in f (x + h) x) by smt().
-    by apply ler_ndivr_mulr; smt(integral_ub).
+    admit. (* broken due to added flb assumption *)
+    (* by apply ler_ndivr_mulr; smt(integral_ub). *)
   + suff: integral f (x + h) x / h + f x < dy by smt().
     apply (ler_lt_trans (- fglb_in f (x + h) x + f x)); last smt(fglb_in_subset).
     suff: integral f (x + h) x / h <= - fglb_in f (x + h) x by smt().
