@@ -9,69 +9,99 @@ require import RealLub RealFLub.
 
 op glb xs = - (lub (xs \o Real.([ - ]))).
 
-op has_flb f = has_fub (f \o Real.([ - ])).
+op has_flb (f : real -> real) = has_fub (Real.([ - ]) \o f).
 
 op flub_in (f : real -> real) (x0 x1 : real) = flub (fun x =>
   if x0 <= x /\ x <= x1 then f x else f x0).
 
-op fglb_in f x0 x1 = - (flub_in (f \o Real.([ - ])) x0 x1).
+op fglb_in f x0 x1 = - (flub_in (Real.([ - ]) \o f) x0 x1).
 
 op has_fub_in (f : real -> real) (x0 x1 : real) = has_fub (fun x =>
   if x0 <= x /\ x <= x1 then f x else f x0).
 
-lemma ler_flub_in f g x0 x1 :
+lemma ler_flub_in f g (x0 x1 : real) :
+  x0 <= x1 =>
   has_fub_in g x0 x1 =>
   (forall x, x0 <= x => x <= x1 => f x <= g x) =>
   flub_in f x0 x1 <= flub_in g x0 x1.
-proof. admitted.
+proof.
+move => le_x0_x1 has_fub_g le_f_g.
+apply ler_flub => /#.
+qed.
 
-op has_flb_in (f : real -> real) (x0 x1 : real) = has_flb (fun x =>
-  if x0 <= x /\ x <= x1 then f x else f x0).
+op has_flb_in (f : real -> real) (x0 x1 : real) = has_fub_in (Real.([ - ]) \o f) x0 x1.
 
 lemma has_flb_in_subset (f : real -> real) (x0 x0' x1 x1' : real) :
   x0 <= x0' =>
   x1' <= x1 =>
   has_flb_in f x0 x1 =>
   has_flb_in f x0' x1'.
-proof. admitted.
+proof.
+move => ?? [r H].
+case (x0' > x1') => ?.
+- rewrite /has_flb_in /has_flb /(\o) /=.
+  exists (- f x0') => /#.
+exists r => /#.
+qed.
 
 lemma has_flb_in_ge (f g : real -> real) (x0 x1 : real) :
   has_flb_in f x0 x1 =>
   (forall x, x0 <= x => x <= x1 => f x <= g x) =>
   has_flb_in g x0 x1.
-proof. admitted.
+proof.
+rewrite /has_flb_in /has_flb /(\o) /=.
+move => ??.
+smt(ler_has_fub).
+qed.
 
-lemma ler_fglb_in f g x0 x1 :
+op is_fub_in f (x0 x1 r : real) = is_fub (fun x =>
+  if x0 <= x /\ x <= x1 then f x else f x0) r.
+
+lemma flub_in_le_ub f x0 x1 r :
+  is_fub_in f x0 x1 r => flub_in f x0 x1 <= r.
+proof. smt(flub_le_ub). qed.
+
+lemma ler_fglb_in f g (x0 x1 : real) :
+  x0 <= x1 =>
   has_flb_in f x0 x1 =>
   (forall x, x0 <= x => x <= x1 => f x <= g x) =>
   fglb_in f x0 x1 <= fglb_in g x0 x1.
-proof. admitted.
+proof. smt(ler_flub_in). qed.
 
 lemma flub_in_upper_bound f (x0 x1 x : real) :
   x0 <= x =>
   x <= x1 =>
+  has_fub_in f x0 x1 =>
   f x <= flub_in f x0 x1.
-proof. admitted.
+proof. smt(flub_upper_bound). qed.
 
 lemma fglb_in_lower_bound f (x0 x1 x : real) :
   x0 <= x =>
   x <= x1 =>
+  has_flb_in f x0 x1 =>
   fglb_in f x0 x1 <= f x.
-proof. admitted.
+proof. by rewrite /has_flb_in /fglb_in /(\o); smt(flub_in_upper_bound). qed.
 
 lemma flub_in_subset f (x0 x1 x0' x1' : real) :
   x0 <= x0' =>
-  x1' <= x1 =>
   x0' <= x1' =>
+  x1' <= x1 =>
+  has_fub_in f x0 x1 =>
   flub_in f x0' x1' <= flub_in f x0 x1.
-proof. admitted.
+proof.
+move => ???.
+rewrite /has_flb_in /flub_in /(\o) /has_fub_in /flub /has_fub /is_fub /=.
+move => [r?].
+apply ler_lub => /#.
+qed.
 
 lemma fglb_in_subset f (x0 x1 x0' x1' : real) :
   x0 <= x0' =>
-  x1' <= x1 =>
   x0' <= x1' =>
+  x1' <= x1 =>
+  has_flb_in f x0 x1 =>
   fglb_in f x0 x1 <= fglb_in f x0' x1'.
-proof. admitted.
+proof. smt(flub_in_subset). qed.
 
 (* standard delta-epsilon definition of a limit *)
 op is_lim (f : real -> real) (x y : real) =
@@ -102,15 +132,56 @@ op lim f x = choiceb (is_lim f x) 0%r.
 op continuous_at f x = (lim_exists f x /\ lim f x = f x).
 op continuous f = forall x, continuous_at f x.
 
-lemma continuous_flub_fglb (f : real -> real) (x eps : real) :
+lemma continuous_flub (f : real -> real) (x eps : real) :
+  0%r < eps =>
   continuous_at f x =>
   exists dx,
   0%r < dx /\
-  flub_in f (x - dx) (x + dx) < (f x + eps) /\
+  has_fub_in f (x - dx) (x + dx) /\
+  flub_in f (x - dx) (x + dx) < f x + eps.
+proof.
+move => ??.
+have [dx [gt0_dx H]]:
+  exists dx, 0%r < dx /\ forall x', x' <> x => `|x' - x| < dx => `|f x' - f x| < eps / 2%r.
+- have H: is_lim f x (f x) by smt(choicebP).
+  apply (H (eps / 2%r)) => /#.
+exists (dx / 2%r).
+split; first smt().
+split.
+- exists (f x + eps) => /#.
+apply (ler_lt_trans (f x + eps / 2%r)); last smt().
+apply flub_in_le_ub => /#.
+qed.
+
+lemma continuous_fglb (f : real -> real) (x eps : real) :
+  0%r < eps =>
+  continuous_at f x =>
+  exists dx,
+  0%r < dx /\
+  has_flb_in f (x - dx) (x + dx) /\
   fglb_in f (x - dx) (x + dx) > f x - eps.
 proof. admitted.
 
-print has_fub_in.
+lemma continuous_flub_fglb (f : real -> real) (x eps : real) :
+  0%r < eps =>
+  continuous_at f x =>
+  exists dx,
+  0%r < dx /\
+  flub_in f (x - dx) (x + dx) < f x + eps /\
+  fglb_in f (x - dx) (x + dx) > f x - eps.
+proof.
+move => gt0_eps continuous_f.
+(*
+apply (continuous_flub f x eps) in H'.
+case H' => [dx0 ?].
+have H': continuous_at f x by assumption.
+apply (continuous_fglb f x eps) in H'.
+case H' => [dx1 ?].
+exists (minr dx0 dx1).
+smt(flub_in_subset fglb_in_subset).
+qed.
+*)
+admitted.
 
 lemma continuous_has_fub_in f x0 x1 :
   continuous f =>
@@ -225,6 +296,7 @@ have ?: (x_i >= x0).
 have ?: (x_ii <= x1).
 - admit.
 apply ler_fglb_in; last smt().
+- admit.
 exact (has_flb_in_subset _ x0 _ x1).
 qed.
 
@@ -461,8 +533,8 @@ rewrite -(integral_const (fglb_in f x0 x1) x0 x1) //=.
 apply integral_le => /=.
  - admit. (* has_flb_in assumption *)
 move => x lb_x ub_x /=.
-exact fglb_in_lower_bound.
-qed.
+apply fglb_in_lower_bound => //.
+admitted.
 
 lemma integral_ub f (x0 x1 : real) :
   x0 < x1 =>
@@ -472,8 +544,8 @@ proof.
 move => ??.
 rewrite -(integral_const (flub_in f x0 x1) x0 x1) //=.
 apply integral_le => //= ???.
-exact flub_in_upper_bound.
-qed.
+apply flub_in_upper_bound => //.
+admitted.
 
 op differential (f : real -> real) (x dx : real) = (f (x + dx) - f x) / dx.
 
@@ -568,6 +640,7 @@ suff: is_lim (differential (integral f x0) x) 0%r (f x).
 - smt(lim_unique choicebP).
 move => dy gt0_dy /=.
 pose dy' := minr dy 0.5.
+(**
 have H: continuous_at f x by smt().
 apply (continuous_flub_fglb f x dy') in H.
 case H => [dx0 [gt0_dx0 [ub_f lb_f]]].
@@ -597,3 +670,5 @@ case (0%r < h) => [gt0_h|le0_h].
     suff: integral f (x + h) x / h <= - fglb_in f (x + h) x by smt().
     apply ler_ndivr_mulr; smt(integral_lb).
 qed.
+**)
+admitted.
