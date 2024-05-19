@@ -654,18 +654,18 @@ qed.
 
 op integral f x0 x1 = lub (is_lower_sum f x0 x1).
 
-(*
-lemma integral_xx f x :
-  integral f x x = 0%r.
-proof. admitted.
-*)
-
-lemma lower_sum_le_integral f x0 x1 y :
+lemma lower_sum_le_integral (f : real -> real) (x0 x1 y : real) :
+  x0 < x1 =>
+  has_flb_in f x0 x1 =>
+  has_fub_in f x0 x1 =>
   is_lower_sum f x0 x1 y =>
   y <= integral f x0 x1.
 proof.
-print integral.
-admitted.
+move => ????.
+rewrite /integral.
+apply lub_upper_bound => //.
+exact has_lub_lower_sum.
+qed.
 
 lemma sorted_from_nth (dfl : 'a) e xs :
   (forall i, 0 <= i => i < size xs - 1 => e (nth dfl xs i) (nth dfl xs (i + 1))) =>
@@ -802,23 +802,21 @@ exact integral_const_ge.
 qed.
 
 lemma integral_le (f1 f2 : real -> real) (x0 x1 : real) :
+  x0 < x1 =>
   has_flb_in f1 x0 x1 =>
   has_fub_in f2 x0 x1 =>
   (forall x, x0 <= x => x <= x1 => f1 x <= f2 x) =>
   integral f1 x0 x1 <= integral f2 x0 x1.
 proof.
-move => has_flb_f1 has_fub_in_f2 le_f1_f2.
-(*
-apply ler_lub; 2,3:smt(has_lub_lower_sum ler_has_flb).
-move => s is_lower_sum_s.
-case is_lower_sum_s => [xs [??]].
-exists (lower_sum f2 xs).
-split; first smt().
-subst.
-exact (lower_sum_le f1 f2 xs x0 x1).
+move => ? has_flb_f1 has_fub_in_f2 le_f1_f2.
+apply ler_lub.
+- move => _ [xs [? <-]].
+  exists (lower_sum f2 xs).
+  split; first smt().
+  exact (lower_sum_le f1 f2 xs x0 x1).
+- smt(has_lub_lower_sum ler_has_flb).
+- exists (lower_sum f1 [x0; x1]) => /#.
 qed.
-*)
-admitted.
 
 lemma integral_lb f (x0 x1 : real) :
   x0 < x1 =>
@@ -871,10 +869,14 @@ apply (ler_trans (lower_sum f (split_partition_to xs x1) + lower_sum f (split_pa
 suff: lower_sum f (split_partition_to xs x1) <= integral f x0 x1 /\
   lower_sum f (split_partition_from xs x1) <= integral f x1 x2 by smt().
 split.
-- apply lower_sum_le_integral.
+- apply lower_sum_le_integral => //=.
+  + apply (has_flb_in_subset _ x0 x0 x2 x1) => /#.
+  + smt().
   exists (split_partition_to xs x1) => /=.
   exact (is_partition_split_to xs x0 x1 x2).
-- apply lower_sum_le_integral.
+- apply lower_sum_le_integral => //=.
+  + smt(has_flb_in_subset).
+  + smt().
   exists (split_partition_from xs x1) => /=.
   exact (is_partition_split_from xs x0 x1 x2).
 qed.
@@ -901,6 +903,31 @@ lemma integral_split f (x1 x0 x2 : real) :
   integral f x0 x2 = integral f x0 x1 + integral f x1 x2.
 proof. smt(integral_split_le integral_split_ge). qed.
 
+lemma continuous_has_fub_in f x0 x1 :
+  continuous f =>
+  has_fub_in f x0 x1.
+proof.
+move => continuous_f.
+case (x0 < x1) => ?; first last.
+- by exists (f x0) => /#.
+admitted.
+
+lemma continuous_has_flb_in f x0 x1 :
+  continuous f =>
+  has_flb_in f x0 x1.
+proof.
+move => continuous_f.
+case (x0 < x1) => ?; first last.
+- by exists (f x0) => /#.
+admitted.
+
+lemma has_fub_in_subset (f : real -> real) (x0 x0' x1 x1' : real) :
+  x0 <= x0' =>
+  x1' <= x1 =>
+  has_fub_in f x0 x1 =>
+  has_fub_in f x0' x1'.
+proof. smt(). qed.
+
 lemma fundamental_theorem_of_calculus (f : real -> real) (x x0 : real) :
   x0 < x =>
   continuous f =>
@@ -912,35 +939,57 @@ suff: is_lim (differential (integral f x0) x) 0%r (f x).
 - smt(lim_unique choicebP).
 move => dy gt0_dy /=.
 pose dy' := minr dy 0.5.
-(**
-have H: continuous_at f x by smt().
-apply (continuous_flub_fglb f x dy') in H.
-case H => [dx0 [gt0_dx0 [ub_f lb_f]]].
+have [dx0 [gt0_dx0 [?[?[??]]]]] : exists dx, 0%r < dx /\
+  has_fub_in f (x - dx) (x + dx) /\
+  flub_in f (x - dx) (x + dx) < f x + dy' /\
+  has_flb_in f (x - dx) (x + dx) /\ 
+ f x - dy' < fglb_in f (x - dx) (x + dx).
+- smt(continuous_flub_fglb).
 pose dx1 := dy' / (2%r * `|f x| + dy').
 pose dx2 := x - x0.
 exists (minr dx0 (minr dx1 dx2)).
 split => [/#| h ne0_h small_h].
 rewrite /differential.
 case (0%r < h) => [gt0_h|le0_h].
-- rewrite (integral_split f x); 1,2,3: smt(continuous_has_flb_in).
+- rewrite (integral_split f x) //=; 1,2,3:smt(continuous_has_flb_in continuous_has_fub_in).
   have ->: integral f x0 x + integral f x (x + h) - integral f x0 x = integral f x (x + h) by smt().
-  case (0%r <= integral f x (x + h) / h - f x); admit.
-  (* broken due to added flb assumption... *)
-  (*
-  + smt(ler_pdivr_mulr integral_ub flub_in_subset).
-  + smt(ler_pdivl_mulr integral_lb fglb_in_subset). *)
-- rewrite (integral_split f (x + h) x0 x); 1,2,3:smt(continuous_has_flb_in).
-  have -> /=: integral f x0 (x + h) - (integral f x0 (x + h) + integral f (x + h) x) = - integral f (x + h) x by smt().
+  rewrite /"`|_|".
+  case (0%r <= integral f x (x + h) / h - f x) => /= _.
+  + rewrite ltr_subl_addl ltr_pdivr_mulr //=.
+    apply (ltr_le_trans ((f x + dy') * h)); last first.
+    * by rewrite ler_pmul2r /#.
+    apply (ler_lt_trans (flub_in f x (x + h) * (x + h - x))); last first.
+    * have ->: x + h - x = h by algebra.
+      rewrite ltr_pmul2r //=.
+      apply (ler_lt_trans (flub_in f (x - dx0) (x + dx0))); last by smt().
+      by apply flub_in_subset => /#.
+    apply (integral_ub f x (x + h)) => //=.
+    * smt().
+    * smt(has_flb_in_subset).
+    * smt(has_fub_in_subset).
+  + apply ltr_oppl.
+    rewrite ltr_subr_addl ltr_pdivl_mulr //.
+    apply (ler_lt_trans ((f x - dy') * h)); first by smt().
+    apply (ltr_le_trans (fglb_in f x (x + h) * h)).
+    * smt(ler_pmul2r fglb_in_subset).
+    have ->: fglb_in f x (x + h) * h = fglb_in f x (x + h) * (x + h - x) by algebra.
+    by apply (integral_lb f x (x + h)); smt(has_flb_in_subset has_fub_in_subset).
+- rewrite (integral_split f (x + h) x0 x) //=;
+    1,2,3,4:smt(continuous_has_flb_in continuous_has_fub_in).
+  have -> /=: integral f x0 (x + h) - (integral f x0 (x + h) + integral f (x + h) x) =
+    - integral f (x + h) x by smt().
   case (0%r <= (- integral f (x + h) x) / h - f x).
   + suff: (- integral f (x + h) x) / h - f x < dy by smt().
     apply (ler_lt_trans (flub_in f (x + h) x - f x)); last smt(flub_in_subset).
     suff: (- integral f (x + h) x) / h <= (flub_in f (x + h) x) by smt().
-    admit. (* broken due to added flb assumption *)
-    (* by apply ler_ndivr_mulr; smt(integral_ub). *)
+    rewrite ler_ndivr_mulr /=; first smt().
+    apply ler_oppr.
+    have ->: - flub_in f (x + h) x * h = flub_in f (x + h) x * (x - (x + h)) by algebra.
+    apply integral_ub; smt(has_flb_in_subset has_fub_in_subset).
   + suff: integral f (x + h) x / h + f x < dy by smt().
     apply (ler_lt_trans (- fglb_in f (x + h) x + f x)); last smt(fglb_in_subset).
     suff: integral f (x + h) x / h <= - fglb_in f (x + h) x by smt().
-    apply ler_ndivr_mulr; smt(integral_lb).
+    apply ler_ndivr_mulr; first smt().
+    have ->: (- fglb_in f (x + h) x) * h = fglb_in f (x + h) x * (x - (x + h)) by algebra.
+    apply integral_lb; smt(has_flb_in_subset has_fub_in_subset).
 qed.
-**)
-admitted.
