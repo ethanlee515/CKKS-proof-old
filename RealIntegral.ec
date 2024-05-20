@@ -3,7 +3,7 @@ import RField.
 import Bigreal Bigreal.BRA.
 require import StdOrder.
 import RealOrder.
-require import RealLub RealFLub.
+require import RealLub RealFLub RealSeq.
 
 lemma subseq_range xs i j :
   sorted Int.(<) xs =>
@@ -294,24 +294,133 @@ split.
   apply flub_in_le_ub => /#.
 split.
 - exists (f x - eps) => /#.
-print ltr_le_trans.
 apply (ltr_le_trans (f x - eps / 2%r)); first smt().
 apply fglb_in_ge_lb => /#.
 qed.
 
-(* oof...
- * Do I actually need these right now? *)
 (*
+lemma realHeineBorel (a b : real) (s : (real * real) -> bool) :
+  (forall x, a <= x => x <= b => exists si, s si /\ fst si < x /\ x < snd si) =>
+  exists lst, forall x, a <= x => x <= b => exists si, si \in lst /\ s si /\ fst si < x /\ x < snd si.
+proof. admitted.
+*)
+
+op real_subseq (s1 s2 : int -> real) =
+  exists m, forall i,
+  s1 i = s2 (m i) /\ i <= m i.
+
+(* crutch for recursive functions *)
+type peano = [ Z | S of peano ].
+
+op peano_to_int p =
+with p = Z => 0
+with p = S p' => 1 + peano_to_int p'.
+
+op int_to_peano i = iter i S Z.
+
+lemma peano_to_intK p :
+  int_to_peano (peano_to_int p) = p.
+proof. admitted.
+
+lemma int_to_peanoK i :
+  0 <= i =>
+  peano_to_int (int_to_peano i) = i.
+proof. admitted.
+
+lemma Bolzano_Weierstrass s (a b : real) :
+  (forall i, a <= s i /\ s i <= b) =>
+  (exists s', real_subseq s' s /\ converge s').
+proof. admitted.
+
+lemma continuous_at_negate f x :
+  continuous_at f x =>
+  continuous_at (Real.([ - ]) \o f) x.
+proof. admitted.
+
+lemma continuous_negate f :
+  continuous f =>
+  continuous (Real.([ - ]) \o f).
+proof.
+rewrite /continuous => H x.
+apply continuous_at_negate.
+exact H.
+qed.
+
+print cnv_bmono_from.
+print cnvtoN.
+print ofint.
+
+print nat.
+print int2nat.
+(*
+lemma fi_diverge : !(converge (%r)).
+proof.
+suff: converge (%r) => false by smt().
+move => [y ?].
+have [N ?]: exists (N : int), forall n, N <= n => `|n%r - y| < 0.5 by smt().
+pose n := max N (ceil y) + 1.
+have ?: `|n%r - y| < 1%r / 2%r by smt().
+smt().
+qed.
+*)
+
+lemma diverge_superlinear (f : int -> real) :
+  (forall i, i%r <= f i) => !(converge f).
+proof.
+move => f_superlinear.
+suff: converge f => false by smt().
+move => [y ?].
+have [N ?]: exists (N : int), forall n, N <= n => `|f n - y| < 0.5 by smt().
+pose n := max N (ceil y) + 1.
+have ?: `|f n - y| < 1%r / 2%r by smt().
+smt(ceil_ge).
+qed.
+
+lemma subseq_superlinear s' s :
+  real_subseq s' s =>
+  (forall i, i%r <= s i) =>
+  forall i, i%r <= s' i.
+proof. smt(). qed.
+
+lemma converge_continuous_map f xs :
+  continuous f =>
+  converge xs =>
+  converge (f \o xs).
+proof. admitted.
+
 lemma continuous_has_fub_in f x0 x1 :
   continuous f =>
   has_fub_in f x0 x1.
-proof. admitted.
+proof.
+move => continuous_f.
+case (x0 < x1) => ?; first last.
+- by exists (f x0) => /#.
+suff: (forall r, exists x, x0 <= x /\ x <= x1 /\ r < f x) => false by smt().
+move => ?.
+pose s (i : int) := choiceb (fun x => x0 <= x /\ x <= x1 /\ i%r < f x) 0%r.
+have [s' [[m ?] ?]] : exists s', real_subseq s' s /\ converge s'.
+- apply (Bolzano_Weierstrass s x0 x1).
+  smt(choicebP).
+have ?: converge (f \o s').
+- exact converge_continuous_map.
+suff: !(converge (f \o s')) by smt().
+apply diverge_superlinear => i.
+rewrite /(\o).
+have ->: f (s' i) = f (s (m i)) by smt().
+have H: (fun (x : real) => x0 <= x /\ x <= x1 /\ (m i)%r < f x) (s (m i)).
+- apply choicebP => /#.
+smt().
+qed.
 
 lemma continuous_has_flb_in f x0 x1 :
   continuous f =>
   has_flb_in f x0 x1.
-proof. admitted.
-*)
+proof.
+move => continuous_f.
+apply continuous_negate in continuous_f.
+rewrite has_flb_in_negate.
+exact continuous_has_fub_in.
+qed.
 
 op is_partition xs (x0 x1 : real) =
   sorted Real.(<) xs /\
@@ -902,24 +1011,6 @@ lemma integral_split f (x1 x0 x2 : real) :
   has_fub_in f x0 x2 =>
   integral f x0 x2 = integral f x0 x1 + integral f x1 x2.
 proof. smt(integral_split_le integral_split_ge). qed.
-
-lemma continuous_has_fub_in f x0 x1 :
-  continuous f =>
-  has_fub_in f x0 x1.
-proof.
-move => continuous_f.
-case (x0 < x1) => ?; first last.
-- by exists (f x0) => /#.
-admitted.
-
-lemma continuous_has_flb_in f x0 x1 :
-  continuous f =>
-  has_flb_in f x0 x1.
-proof.
-move => continuous_f.
-case (x0 < x1) => ?; first last.
-- by exists (f x0) => /#.
-admitted.
 
 lemma has_fub_in_subset (f : real -> real) (x0 x0' x1 x1' : real) :
   x0 <= x0' =>
