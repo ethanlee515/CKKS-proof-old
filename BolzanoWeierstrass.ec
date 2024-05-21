@@ -4,15 +4,37 @@ import IntOrder.
 
 (* -- Utility stuff -- *)
 
+lemma iter_incr_aux (f : int -> real) (a j : int) :
+  0 <= j =>
+  (forall i, a <= i => i < (a + j) => f i <= f (i + 1)) =>
+  f a <= f (a + j).
+proof.
+move => ge0_j.
+apply (intind (fun j =>
+  (forall i, a <= i => i < (a + j) => f i <= f (i + 1)) =>
+  f a <= f (a + j))) => /#.
+qed.
+
 lemma iter_incr (f : int -> real) (a b : int) :
+  a <= b =>
   (forall i, a <= i => i < b => f i <= f (i + 1)) =>
   f a <= f b.
-proof. admitted.
+proof.
+move => ?.
+have ->: b = a + (b - a) by algebra.
+apply (iter_incr_aux f a (b - a)) => /#.
+qed.
 
 lemma iter_decr (f : int -> real) (a b : int) :
+  a <= b =>
   (forall i, a <= i => i < b => f (i + 1) <= f i) =>
   f b <= f a.
-proof. admitted.
+proof.
+pose g := Real.([ - ]) \o f.
+move => ??.
+suff: g a <= g b by smt().
+apply iter_incr => /#.
+qed.
 
 lemma cnv_bmono_from_decr (s : int -> real) (M : real) (N : int) :
   (forall n p, N <= n && n <= p => s p <= s n) =>
@@ -36,28 +58,19 @@ with p = S p' => 1 + peano_to_int p'.
 
 op int_to_peano i = iter i S Z.
 
-lemma peano_to_intK p :
-  int_to_peano (peano_to_int p) = p.
-proof. admitted.
-
-lemma int_to_peanoK i :
-  0 <= i =>
-  peano_to_int (int_to_peano i) = i.
-proof. admitted.
-
-lemma int_to_peano0 :
-  int_to_peano 0 = Z.
-proof. admitted.
-
 lemma int_to_peano_le0 i :
   i <= 0 =>
   int_to_peano i = Z.
 proof. smt(iteri0). qed.
 
+lemma int_to_peano0 :
+  int_to_peano 0 = Z.
+proof. exact int_to_peano_le0. qed.
+
 lemma int_to_peanoS i :
   0 < i =>
   int_to_peano i = S (int_to_peano (i - 1)).
-proof. admitted.
+proof. smt(iteriS). qed.
 
 (* -- actual proof -- *)
 
@@ -162,14 +175,6 @@ lemma no_peaks_after_ge_loc0 x_ loc :
   no_peaks_after x_ loc.
 proof. smt(choicebP). qed.
 
-(*
-lemma not_peakE x_ p :
-  0 <= p =>
-  !(is_peak x_ p) =>
-  exists m, p < m /\ x_ p < x_ m.
-proof. smt(). qed.
-*)
-
 lemma incr_well_defined_aux x_ i :
   finite_peaks x_ =>
   incr_loc0 x_ <= incr_loc x_ i /\
@@ -219,41 +224,6 @@ rewrite int_to_peano_le0 //=.
 exact ge0_incr_loc_SZ.
 qed.
 
-(* Not true: Need last_loc to be past the final peak. *)
-(*
-lemma is_incr_loc_gt x_ last_loc :
-  finite_peaks x_ =>
-  last_loc < choiceb (is_incr_loc x_ last_loc) 0.
-proof.
-move => [p [ge0_p ?]].
-print is_incr_loc.
-suff: (is_incr_loc x_ last_loc) (choiceb (is_incr_loc x_ last_loc) 0) by smt().
-apply (choicebP (is_incr_loc x_ last_loc)).
-print is_peak.
-admitted.
-*)
-(*
-
-rewrite /is_incr_loc.
-print is_peak.
-
-case (last_loc < 0) => ?; first admit.
-print is_peak.
-
-print is_incr_loc.
-
-exists (last_loc + 1); smt().
-
-print no_peaks_after.
-
-case (0 < p) => ?; first admit.
-exists (p + 1); smt(choicebP).
-print finite_peaks.
-
-smt(choicebP).
-admitted.
-*)
-
 lemma incr_subseq x_ :
   finite_peaks x_ =>
   real_subseq (incr_val x_) x_.
@@ -278,10 +248,12 @@ lemma incr_increasing x_ i :
 proof.
 move => finite_peaks_x.
 rewrite /incr_val /(\o) /=.
-print incr_well_defined_aux.
-print incr_loc.
-print incr_val.
-admitted.
+case (i < 0) => ?.
+- smt(int_to_peano_le0).
+rewrite (int_to_peanoS (i +1 )) /=.
+- smt().
+smt(incr_well_defined choicebP).
+qed.
 
 lemma incr_ub x_ (b : real) :
   finite_peaks x_ =>
@@ -306,53 +278,21 @@ proof.
 move => lb_x ub_x.
 case (exists p, no_peaks_after x_ p) => ?.
 - exists (incr_val x_).
-  (* this should be increasing *)
   split; first exact incr_subseq.
   apply (cnv_bmono_from _ b 0).
   + move => n p ?.
-    apply (iter_incr (incr_val x_)) => i lb_i ub_i.
+    apply (iter_incr (incr_val x_)); first smt().
+    move => i lb_i ub_i.
     exact incr_increasing.
   move => n ?.
   exact incr_ub.
 - exists (peaks_val x_).
-  (* this should be decreasing *)
   split; first exact peaks_subseq.
   apply (cnv_bmono_from_decr _ a 0).
   + move => n p ?.
-    apply (iter_decr (peaks_val x_)) => i lb_i ub_i.
+    apply (iter_decr (peaks_val x_)); first smt().
+    move => i lb_i ub_i.
     exact peaks_decreasing.
   move => n? .
   exact peaks_lb.
 qed.
-
-(* doesn't belong here? *)
-
-(*
-lemma fi_diverge : !(converge (%r)).
-proof.
-suff: converge (%r) => false by smt().
-move => [y ?].
-have [N ?]: exists (N : int), forall n, N <= n => `|n%r - y| < 0.5 by smt().
-pose n := max N (ceil y) + 1.
-have ?: `|n%r - y| < 1%r / 2%r by smt().
-smt().
-qed.
-*)
-
-lemma diverge_superlinear (f : int -> real) :
-  (forall i, i%r <= f i) => !(converge f).
-proof.
-move => f_superlinear.
-suff: converge f => false by smt().
-move => [y ?].
-have [N ?]: exists (N : int), forall n, N <= n => `|f n - y| < 0.5 by smt().
-pose n := max N (ceil y) + 1.
-have ?: `|f n - y| < 1%r / 2%r by smt().
-smt(ceil_ge).
-qed.
-
-lemma subseq_superlinear s' s :
-  real_subseq s' s =>
-  (forall i, i%r <= s i) =>
-  forall i, i%r <= s' i.
-proof. smt(). qed.

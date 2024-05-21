@@ -101,6 +101,37 @@ have -> /=: size xs - 1 < size xs by smt().
 smt(last_nth).
 qed.
 
+(*
+lemma fi_diverge : !(converge (%r)).
+proof.
+suff: converge (%r) => false by smt().
+move => [y ?].
+have [N ?]: exists (N : int), forall n, N <= n => `|n%r - y| < 0.5 by smt().
+pose n := max N (ceil y) + 1.
+have ?: `|n%r - y| < 1%r / 2%r by smt().
+smt().
+qed.
+*)
+
+lemma diverge_superlinear (f : int -> real) :
+  (forall i, i%r <= f i) => !(converge f).
+proof.
+move => f_superlinear.
+suff: converge f => false by smt().
+move => [y ?].
+have [N ?]: exists (N : int), forall n, N <= n => `|f n - y| < 0.5 by smt().
+pose n := max N (ceil y) + 1.
+have ?: `|f n - y| < 1%r / 2%r by smt().
+smt(ceil_ge).
+qed.
+
+lemma subseq_superlinear s' s :
+  real_subseq s' s =>
+  (forall i, i%r <= s i) =>
+  forall i, i%r <= s' i.
+proof. smt(). qed.
+
+
 (* -- Extending RealFlub -- *)
 
 lemma ler_sum_lub (E1 E2 E3 : real -> bool) :
