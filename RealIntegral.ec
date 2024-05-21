@@ -19,31 +19,16 @@ lemma mem_head (w : 'a) xs :
   xs <> [] <=> head w xs \in xs.
 proof. smt(). qed.
 
-lemma subseq_range xs i j :
-  sorted Int.(<) xs =>
-  i <= head i xs =>
-  last i xs < j =>
-  subseq xs (range i j).
-proof.
-move => sorted_xs ge_xs_i lt_xs_j.
-apply subseqP.
-admitted.
-
-lemma sorted_behead (e : 'a -> 'a -> bool) xs :
+lemma mask_sorted (e : 'a -> 'a -> bool) m xs :
   (forall (y x z : 'a), e x y => e y z => e x z) =>
+  size m = size xs =>
   sorted e xs =>
-  sorted e (behead xs).
+  sorted e (mask m xs).
 proof.
-move => ?.
-case (xs = []) => ?; first smt().
-apply subseq_sorted => //=.
+move => ??.
+apply subseq_sorted => //.
 apply subseqP.
-exists (false :: nseq (size xs - 1) true).
-split; first smt(size_nseq size_ge0).
-rewrite -{3}(head_behead xs witness) //.
-rewrite mask_cons /b2i /=.
-rewrite nseq0 cat0s.
-rewrite mask_true /#.
+by exists m.
 qed.
 
 lemma sorted_from_nth (dfl : 'a) e xs :
@@ -60,6 +45,60 @@ suff: sorted e x_tail.
   smt(size_ge0).
 apply sorted_xs => i ge0_i ub_i.
 smt(size_ge0).
+qed.
+
+lemma uniq_irreflexive_sorted (e : 'a -> 'a -> bool) xs :
+  (forall (y x z : 'a), e x y => e y z => e x z) =>
+  (forall x, !(e x x)) =>
+  sorted e xs =>
+  uniq xs.
+proof.
+move => ??.
+elim xs => // x xs iH.
+move => ?.
+admitted.
+
+lemma uniq_sorted_mask (e : 'a -> 'a -> bool) xs ys :
+  uniq xs =>
+  uniq ys =>
+  sorted e xs =>
+  sorted e ys =>
+  xs = mask (map (mem xs) ys) ys.
+proof.
+admitted.
+
+lemma subseq_range xs i j :
+  sorted Int.(<) xs =>
+  i <= head i xs =>
+  last i xs < j =>
+  subseq xs (range i j).
+proof.
+move => sorted_xs ge_xs_i lt_xs_j.
+apply subseqP.
+exists (map (mem xs) (range i j)).
+split; first by rewrite size_map.
+apply (uniq_sorted_mask Int.(<)) => //.
+- apply (uniq_irreflexive_sorted Int.(<)) => /#.
+- exact range_uniq.
+- apply (sorted_from_nth 0).
+  smt(nth_range size_ge0 size_range).
+qed.
+
+lemma sorted_behead (e : 'a -> 'a -> bool) xs :
+  (forall (y x z : 'a), e x y => e y z => e x z) =>
+  sorted e xs =>
+  sorted e (behead xs).
+proof.
+move => ?.
+case (xs = []) => ?; first smt().
+apply subseq_sorted => //=.
+apply subseqP.
+exists (false :: nseq (size xs - 1) true).
+split; first smt(size_nseq size_ge0).
+rewrite -{3}(head_behead xs witness) //.
+rewrite mask_cons /b2i /=.
+rewrite nseq0 cat0s.
+rewrite mask_true /#.
 qed.
 
 lemma sorted_nth (dfl : 'a) e xs :
@@ -101,17 +140,48 @@ have -> /=: size xs - 1 < size xs by smt().
 smt(last_nth).
 qed.
 
-(*
-lemma fi_diverge : !(converge (%r)).
+lemma sorted_cons dfl (e : 'a -> 'a -> bool) xs x :
+  (forall (y x z : 'a), e x y => e y z => e x z) =>
+  sorted e xs =>
+  (xs <> [] => e x (head dfl xs)) =>
+  sorted e (x :: xs).
+proof. smt(). qed.
+
+lemma sorted_cat (dfl : 'a) e xs1 xs2 :
+  (forall (y x z : 'a), e x y => e y z => e x z) =>
+  xs1 <> [] =>
+  xs2 <> [] =>
+  sorted e xs1 =>
+  sorted e xs2 =>
+  e (last dfl xs1) (head dfl xs2) =>
+  sorted e (xs1 ++ xs2).
 proof.
-suff: converge (%r) => false by smt().
-move => [y ?].
-have [N ?]: exists (N : int), forall n, N <= n => `|n%r - y| < 0.5 by smt().
-pose n := max N (ceil y) + 1.
-have ?: `|n%r - y| < 1%r / 2%r by smt().
-smt().
+move => ??????.
+apply (sorted_from_nth dfl) => i ge0_i ub_i.
+rewrite size_cat in ub_i.
+case (i < size xs1 - 1) => [?|?].
+- rewrite !nth_cat.
+  have -> /=: i < size xs1 by smt().
+  have -> /=: i + 1 < size xs1 by smt().
+  suff: sorted e [nth dfl xs1 i; nth dfl xs1 (i + 1)] by smt().
+  apply (subseq_sorted e _ _ xs1) => //.
+  rewrite -{3}(map_nth_range dfl xs1).
+  apply (map_subseq (nth dfl xs1) [i; i + 1]).
+  apply subseq_range => /#.
+case (i = size xs1 - 1) => [?|?].
+- rewrite !nth_cat.
+  have -> /=: i < size xs1 by smt().
+  have -> /=: !(i + 1 < size xs1) by smt().
+  smt(nth_last).
+rewrite !nth_cat.
+have -> /=: !(i < size xs1) by smt().
+have -> /=: !(i + 1 < size xs1) by smt().
+suff: sorted e [nth dfl xs2 (i - size xs1); nth dfl xs2 (i + 1 - size xs1)] by smt().
+apply (subseq_sorted e _ _ xs2) => //.
+rewrite -{3}(map_nth_range dfl xs2).
+apply (map_subseq (nth dfl xs2) [i - size xs1; i + 1 - size xs1]).
+apply subseq_range => /#.
 qed.
-*)
 
 lemma diverge_superlinear (f : int -> real) :
   (forall i, i%r <= f i) => !(converge f).
@@ -130,7 +200,6 @@ lemma subseq_superlinear s' s :
   (forall i, i%r <= s i) =>
   forall i, i%r <= s' i.
 proof. smt(). qed.
-
 
 (* -- Extending RealFlub -- *)
 
@@ -426,17 +495,17 @@ apply (ltr_le_trans (f x - eps / 2%r)); first smt().
 apply fglb_in_ge_lb => /#.
 qed.
 
-(*
-lemma realHeineBorel (a b : real) (s : (real * real) -> bool) :
-  (forall x, a <= x => x <= b => exists si, s si /\ fst si < x /\ x < snd si) =>
-  exists lst, forall x, a <= x => x <= b => exists si, si \in lst /\ s si /\ fst si < x /\ x < snd si.
-proof. admitted.
-*)
-
 lemma continuous_at_negate f x :
   continuous_at f x =>
   continuous_at (Real.([ - ]) \o f) x.
-proof. admitted.
+proof.
+move => [[y?]?].
+print continuous_at.
+split.
+- suff: is_lim (Real.([-]) \o f) x (- f x).
+  + move => ?; first by exists (-f x).
+  admit.
+admitted.
 
 lemma continuous_negate f :
   continuous f =>
@@ -451,7 +520,10 @@ lemma converge_continuous_map f xs :
   continuous f =>
   converge xs =>
   converge (f \o xs).
-proof. admitted.
+proof.
+move => ??.
+
+admitted.
 
 lemma continuous_has_fub_in f x0 x1 :
   continuous f =>
@@ -540,13 +612,17 @@ qed.
 lemma mem_interval_lb xs x0 x1 xi xii :
   is_partition xs x0 x1 =>
   (xi, xii) \in make_intervals xs =>
-  x0 < xi.
-proof. admitted.
+  x0 <= xi.
+proof.
+move => ??.
+have ?: xi \in xs by smt(mem_interval).
+print is_partition.
+admitted.
 
 lemma mem_interval_ub xs x0 x1 xi xii :
   is_partition xs x0 x1 =>
   (xi, xii) \in make_intervals xs =>
-  xii < x1.
+  xii <= x1.
 proof. admitted.
 
 lemma adjacent_intervals xs x0 x1 i :
@@ -573,8 +649,8 @@ apply ler_sum_seq => /= [[xi xii] mem_xi] _.
 rewrite /lower_sum_ith /=.
 suff: fglb_in f1 xi xii <= fglb_in f2 xi xii.
 - smt(lt_make_interval).
-have ?: x0 < xi by smt(mem_interval_lb).
-have ?: xii < x1 by smt(mem_interval_ub).
+have ?: x0 <= xi by smt(mem_interval_lb).
+have ?: xii <= x1 by smt(mem_interval_ub).
 apply ler_fglb_in.
 - smt(lt_make_interval).
 - by apply (has_flb_in_subset _ x0 _ x1); smt().
@@ -586,17 +662,6 @@ op split_partition_to (xs : real list) (x : real) =
 
 op split_partition_from (xs : real list) (x : real) =
   x :: (filter (fun a => x < a) xs).
-
-(*
-lemma filter_last (xs : 'a list) dfl f :
-  f (last dfl xs) =>
-  last dfl (filter f xs) = last dfl xs.
-proof.
-case (xs = []); first smt().
-move => not_nil_xs f_last.
-print filter.
-admitted.
-*)
 
 lemma sorted_split_partition_to xs x :
   xs <> [] =>
@@ -657,17 +722,39 @@ lemma sorted_split_partition_from xs x :
   sorted Real.(<=) xs =>
   sorted Real.(<=) (split_partition_from xs x).
 proof.
-admitted.
+move => ?? sorted_xs.
+rewrite /split_partition_from.
+apply (sorted_cons 0%r) => //.
+- smt().
+- by apply sorted_filter => /#.
+move => ?.
+suff: head 0%r (filter ((<) x) xs) \in filter ((<) x) xs.
+- move => H.
+  by rewrite mem_filter /# in H.
+smt(mem_head).
+ qed.
 
 lemma head_split_partition_from xs x :
   head 0%r (split_partition_from xs x) = x.
-proof. admitted.
+proof. smt(). qed.
 
 lemma last_split_partition_from xs x :
   xs <> [] =>
-  x <= last 0%r xs =>
+  x < last 0%r xs =>
   last 0%r (split_partition_from xs x) = last 0%r xs.
-proof. admitted.
+proof.
+move => ??.
+pose ys := rev xs.
+have ->: xs = rev ys by smt(revK).
+rewrite last_rev.
+rewrite last_cons.
+rewrite filter_rev.
+have ?: ys <> [] by smt(rev_nil revK).
+have ?: x < head 0%r ys by smt(last_rev revK).
+rewrite last_rev.
+rewrite -{1}(head_behead ys 0%r) //.
+rewrite filter_cons /#.
+qed.
 
 lemma is_partition_split_from xs (x0 x1 x2 : real) :
   x0 < x1 =>
@@ -716,14 +803,36 @@ proof. smt(fglb_in_subset). qed.
 lemma partition_lb xs x0 x1 x :
   is_partition xs x0 x1 =>
   x \in xs =>
-  x0 < x.
-proof. admitted.
+  x0 <= x.
+proof.
+move => ? mem_x.
+rewrite (nthP 0%r) in mem_x.
+case mem_x => [i [rg_i <-]].
+have ->: x0 = nth 0%r xs 0 by smt().
+case (i = 0) => [/#|?].
+suff: sorted Real.( < ) (map (nth 0%r xs) [0; i]) by smt().
+apply (subseq_sorted _ _ _ xs) => //; 1,3: smt().
+rewrite -{2}(map_nth_range 0%r xs).
+apply (map_subseq (nth 0%r xs)).
+by apply subseq_range => /#.
+qed.
 
 lemma partition_ub xs x0 x1 x :
   is_partition xs x0 x1 =>
   x \in xs =>
-  x < x1.
-proof. admitted.
+  x <= x1.
+proof.
+move => ? mem_x.
+rewrite (nthP 0%r) in mem_x.
+case mem_x => [i [rg_i <-]].
+have ->: x1 = nth 0%r xs (size xs - 1) by smt(nth_last).
+case (i = size xs - 1) => [/#|?].
+suff: sorted Real.( < ) (map (nth 0%r xs) [i; size xs - 1]) by smt().
+apply (subseq_sorted _ _ _ xs) => //; 1,3: smt().
+rewrite -{3}(map_nth_range 0%r xs).
+apply (map_subseq (nth 0%r xs)).
+by apply subseq_range => /#.
+qed.
 
 lemma split_lower_sum x f xs x0 x1 :
   is_partition xs x0 x1 =>
@@ -822,42 +931,6 @@ move => ????.
 rewrite /integral.
 apply lub_upper_bound => //.
 exact has_lub_lower_sum.
-qed.
-
-lemma sorted_cat (dfl : 'a) e xs1 xs2 :
-  (forall (y x z : 'a), e x y => e y z => e x z) =>
-  xs1 <> [] =>
-  xs2 <> [] =>
-  sorted e xs1 =>
-  sorted e xs2 =>
-  e (last dfl xs1) (head dfl xs2) =>
-  sorted e (xs1 ++ xs2).
-proof.
-move => ??????.
-apply (sorted_from_nth dfl) => i ge0_i ub_i.
-rewrite size_cat in ub_i.
-case (i < size xs1 - 1) => [?|?].
-- rewrite !nth_cat.
-  have -> /=: i < size xs1 by smt().
-  have -> /=: i + 1 < size xs1 by smt().
-  suff: sorted e [nth dfl xs1 i; nth dfl xs1 (i + 1)] by smt().
-  apply (subseq_sorted e _ _ xs1) => //.
-  rewrite -{3}(map_nth_range dfl xs1).
-  apply (map_subseq (nth dfl xs1) [i; i + 1]).
-  apply subseq_range => /#.
-case (i = size xs1 - 1) => [?|?].
-- rewrite !nth_cat.
-  have -> /=: i < size xs1 by smt().
-  have -> /=: !(i + 1 < size xs1) by smt().
-  smt(nth_last).
-rewrite !nth_cat.
-have -> /=: !(i < size xs1) by smt().
-have -> /=: !(i + 1 < size xs1) by smt().
-suff: sorted e [nth dfl xs2 (i - size xs1); nth dfl xs2 (i + 1 - size xs1)] by smt().
-apply (subseq_sorted e _ _ xs2) => //.
-rewrite -{3}(map_nth_range dfl xs2).
-apply (map_subseq (nth dfl xs2) [i - size xs1; i + 1 - size xs1]).
-apply subseq_range => /#.
 qed.
 
 lemma is_lower_sum_cat f (x1 x0 x2 aL aR : real) :
