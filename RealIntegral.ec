@@ -521,9 +521,24 @@ lemma converge_continuous_map f xs :
   converge xs =>
   converge (f \o xs).
 proof.
-move => ??.
-
-admitted.
+move => ? [lx converge_to_lx].
+have H: continuous_at f lx by smt().
+case H => [[ly is_lim_ly]?].
+exists ly.
+rewrite /(\o) /= => eps gt0_eps.
+have [dx [gt0_dx ?]]:
+  exists dx, 0%r < dx /\ forall x', x' <> lx => `|x' - lx| < dx => `|f x' - ly| < eps.
+- exact is_lim_ly.
+have [N ?]: exists (N : int), forall n, N <= n => `|xs n - lx| < dx.
+- exact converge_to_lx.
+exists N.
+move => n geN_n.
+case (xs n = lx); last smt().
+move => ->.
+suff: f lx = ly by smt().
+suff: is_lim f lx (f lx) by smt(lim_unique).
+smt(choicebP).
+qed.
 
 lemma continuous_has_fub_in f x0 x1 :
   continuous f =>
@@ -614,16 +629,35 @@ lemma mem_interval_lb xs x0 x1 xi xii :
   (xi, xii) \in make_intervals xs =>
   x0 <= xi.
 proof.
-move => ??.
-have ?: xi \in xs by smt(mem_interval).
-print is_partition.
-admitted.
+rewrite /make_intervals /= => ?.
+rewrite mapP /=.
+move => [i [rg_i [->]]].
+move => _.
+rewrite mem_range in rg_i.
+case (i = 0) => ?; first smt().
+suff: sorted Real.( < ) (map (nth 0%r xs) [0; i]) by smt().
+apply (subseq_sorted _ _ _ xs); 1,3: smt().
+rewrite -{2}(map_nth_range 0%r xs).
+apply map_subseq.
+by apply subseq_range => /#.
+qed.
 
 lemma mem_interval_ub xs x0 x1 xi xii :
   is_partition xs x0 x1 =>
   (xi, xii) \in make_intervals xs =>
   xii <= x1.
-proof. admitted.
+proof.
+move => is_partition_xs.
+rewrite /make_intervals mapP /=.
+move => [i [rg_i [??]]]; subst.
+rewrite mem_range in rg_i.
+case (i = size xs - 2) => ?; first smt(nth_last).
+suff: sorted Real.( < ) (map (nth 0%r xs) [i + 1; size xs - 1]) by smt(nth_last).
+apply (subseq_sorted _ _ _ xs); 1,3:smt().
+rewrite -{3}(map_nth_range 0%r xs).
+apply map_subseq.
+by apply subseq_range => /#.
+qed.
 
 lemma adjacent_intervals xs x0 x1 i :
   is_partition xs x0 x1 =>
@@ -719,8 +753,8 @@ qed.
 lemma sorted_split_partition_from xs x :
   xs <> [] =>
   x >= head 0%r xs =>
-  sorted Real.(<=) xs =>
-  sorted Real.(<=) (split_partition_from xs x).
+  sorted Real.(<) xs =>
+  sorted Real.(<) (split_partition_from xs x).
 proof.
 move => ?? sorted_xs.
 rewrite /split_partition_from.
@@ -732,7 +766,7 @@ suff: head 0%r (filter ((<) x) xs) \in filter ((<) x) xs.
 - move => H.
   by rewrite mem_filter /# in H.
 smt(mem_head).
- qed.
+qed.
 
 lemma head_split_partition_from xs x :
   head 0%r (split_partition_from xs x) = x.
@@ -761,7 +795,14 @@ lemma is_partition_split_from xs (x0 x1 x2 : real) :
   x1 < x2 =>
   is_partition xs x0 x2 =>
   is_partition (split_partition_from xs x1) x1 x2.
-proof. admitted.
+proof.
+move => ???.
+rewrite /is_partition.
+split; first apply sorted_split_partition_from => /#.
+split => //.
+split; first apply head_split_partition_from => /#.
+by rewrite last_split_partition_from /#.
+qed.
 
 lemma cat_split_intervals_mem xs x0 x1 x :
   is_partition xs x0 x1 =>
@@ -954,10 +995,8 @@ congr; apply (eq_from_nth (0%r, 0%r)).
 - smt(size_cat size_map size_range size_ge0).
 move => i rg_i.
 rewrite size_map size_range size_cat /= in rg_i.
-rewrite (nth_map 0) /=.
-- admit.
-rewrite nth_range /=.
-- admit.
+rewrite (nth_map 0) /=; first smt(size_range size_cat size_ge0).
+rewrite nth_range /=; first smt(size_cat).
 case (i < size xs0 - 1) => ?.
 - rewrite !nth_cat.
   have -> /=: i < size xs0 by smt().
