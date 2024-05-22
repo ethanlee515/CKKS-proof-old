@@ -31,6 +31,16 @@ apply subseqP.
 by exists m.
 qed.
 
+lemma sorted_take (e : 'a -> 'a -> bool) xs n :
+  sorted e xs =>
+  sorted e (take n xs).
+proof. move: n; elim xs; smt(). qed.
+
+lemma sorted_drop (e : 'a -> 'a -> bool) xs n :
+  sorted e xs =>
+  sorted e (drop n xs).
+proof. move: n; elim xs; smt(). qed.
+
 lemma sorted_from_nth (dfl : 'a) e xs :
   (forall i, 0 <= i => i < size xs - 1 => e (nth dfl xs i) (nth dfl xs (i + 1))) =>
   sorted e xs.
@@ -281,6 +291,47 @@ apply (map_subseq (nth dfl xs2) [i - size xs1; i + 1 - size xs1]).
 apply subseq_range => /#.
 qed.
 
+lemma uniq_irreflexive_sorted (e : 'a -> 'a -> bool) xs :
+  (forall (y x z : 'a), e x y => e y z => e x z) =>
+  (forall x, !(e x x)) =>
+  sorted e xs =>
+  uniq xs.
+proof.
+move => ??.
+elim xs => // x xs iH.
+move => H /=.
+split; last smt().
+suff: (x \in xs) => false by smt().
+move => contr.
+rewrite (nthP witness) in contr.
+case contr => [i [rg_i ?]].
+have ?: (i + 1) < size (x :: xs) => e (nth witness (x :: xs) 0) (nth witness (x :: xs) (i + 1)).
+- by apply sorted_nth_gapped => /#.
+smt().
+qed.
+
+lemma mem_take_from_nth (dfl : 'a) x xs i j :
+  x \in xs =>
+  x = nth dfl xs j =>
+  0 <= j =>
+  j < i =>
+  i < size xs =>
+  x \in take i xs.
+proof. move: i j; elim xs; smt(). qed.
+
+lemma mem_drop_from_nth (dfl : 'a) x xs i j :
+  x \in xs =>
+  x = nth dfl xs j =>
+  0 <= i =>
+  i < j =>
+  j < size xs =>
+  x \in drop i xs.
+proof.
+move => ?????.
+apply (nthP dfl).
+exists (j - i); smt(size_drop nth_drop).
+qed.
+
 lemma diverge_superlinear (f : int -> real) :
   (forall i, i%r <= f i) => !(converge f).
 proof.
@@ -292,12 +343,6 @@ pose n := max N (ceil y) + 1.
 have ?: `|f n - y| < 1%r / 2%r by smt().
 smt(ceil_ge).
 qed.
-
-lemma subseq_superlinear s' s :
-  real_subseq s' s =>
-  (forall i, i%r <= s i) =>
-  forall i, i%r <= s' i.
-proof. smt(). qed.
 
 (* -- Extending RealFlub -- *)
 
@@ -511,11 +556,27 @@ apply flub_in_le_ub.
 by rewrite -is_flb_in_negate.
 qed.
 
+lemma flgb_in_const x0 x1 c :
+  fglb_in (fun (_: real) => c) x0 x1 = c.
+proof.
+rewrite fglb_in_negate.
+- exists c => /#.
+rewrite /(\o) /flub_in /=.
+by rewrite flub_const.
+qed.
+
 (* standard delta-epsilon definition of limits and continuity *)
 
 op is_lim (f : real -> real) (x y : real) =
   forall dy, 0%r < dy =>
   (exists dx, 0%r < dx /\ forall x', x' <> x => `|x' - x| < dx => `|f x' - y| < dy).
+op lim_exists f x = exists y, is_lim f x y.
+op lim f x = choiceb (is_lim f x) 0%r.
+op slope (f : real -> real) (x dx : real) = (f (x + dx) - f x) / dx.
+op derive f x = lim (slope f x) 0%r.
+op differentiable_at f x = lim_exists (slope f x) 0%r.
+op continuous_at f x = (lim_exists f x /\ lim f x = f x).
+op continuous f = forall x, continuous_at f x.
 
 lemma lim_unique f x y0 y1 :
   is_lim f x y0 => is_lim f x y1 => y0 = y1.
@@ -535,14 +596,6 @@ have ?: `|f x0 - y0| < eps by smt().
 have ?: `|f x0 - y1| < eps by smt().
 smt().
 qed.
-
-op lim_exists f x = exists y, is_lim f x y.
-op lim f x = choiceb (is_lim f x) 0%r.
-op differential (f : real -> real) (x dx : real) = (f (x + dx) - f x) / dx.
-op derive f x = lim (differential f x) 0%r.
-op differentiable_at f x = lim_exists (differential f x) 0%r.
-op continuous_at f x = (lim_exists f x /\ lim f x = f x).
-op continuous f = forall x, continuous_at f x.
 
 lemma continuous_flub (f : real -> real) (x eps : real) :
   0%r < eps =>
@@ -910,57 +963,6 @@ split; first apply sorted_split_partition_from => /#.
 split => //.
 split; first apply head_split_partition_from => /#.
 by rewrite last_split_partition_from /#.
-qed.
-
-lemma sorted_take (e : 'a -> 'a -> bool) xs n :
-  sorted e xs =>
-  sorted e (take n xs).
-proof. move: n; elim xs; smt(). qed.
-
-lemma sorted_drop (e : 'a -> 'a -> bool) xs n :
-  sorted e xs =>
-  sorted e (drop n xs).
-proof. move: n; elim xs; smt(). qed.
-
-lemma uniq_irreflexive_sorted (e : 'a -> 'a -> bool) xs :
-  (forall (y x z : 'a), e x y => e y z => e x z) =>
-  (forall x, !(e x x)) =>
-  sorted e xs =>
-  uniq xs.
-proof.
-move => ??.
-elim xs => // x xs iH.
-move => H /=.
-split; last smt().
-suff: (x \in xs) => false by smt().
-move => contr.
-rewrite (nthP witness) in contr.
-case contr => [i [rg_i ?]].
-have ?: (i + 1) < size (x :: xs) => e (nth witness (x :: xs) 0) (nth witness (x :: xs) (i + 1)).
-- by apply sorted_nth_gapped => /#.
-smt().
-qed.
-
-lemma mem_take_from_nth (dfl : 'a) x xs i j :
-  x \in xs =>
-  x = nth dfl xs j =>
-  0 <= j =>
-  j < i =>
-  i < size xs =>
-  x \in take i xs.
-proof. move: i j; elim xs; smt(). qed.
-
-lemma mem_drop_from_nth (dfl : 'a) x xs i j :
-  x \in xs =>
-  x = nth dfl xs j =>
-  0 <= i =>
-  i < j =>
-  j < size xs =>
-  x \in drop i xs.
-proof.
-move => ?????.
-apply (nthP dfl).
-exists (j - i); smt(size_drop nth_drop).
 qed.
 
 lemma split_partition_mem xs x0 x1 x :
@@ -1392,15 +1394,6 @@ apply (has_flb_in_subset f x0 _ x1) => //.
   smt(mem_filter mem_last).
 qed.
 
-lemma flgb_in_const x0 x1 c :
-  fglb_in (fun (_: real) => c) x0 x1 = c.
-proof.
-rewrite fglb_in_negate.
-- exists c => /#.
-rewrite /(\o) /flub_in /=.
-by rewrite flub_const.
-qed.
-
 lemma lower_sum_const xs x0 x1 c :
   is_partition xs x0 x1 =>
   lower_sum (fun _ => c) xs = c * (x1 - x0).
@@ -1630,7 +1623,7 @@ lemma fundamental_theorem_of_calculus (f : real -> real) (x x0 : real) :
   derive (integral f x0) x = f x.
 proof.
 move => order_xs continuous_f.
-suff: is_lim (differential (integral f x0) x) 0%r (f x).
+suff: is_lim (slope (integral f x0) x) 0%r (f x).
 - smt(lim_unique choicebP).
 move => dy gt0_dy /=.
 pose dy' := minr dy 0.5.
@@ -1644,7 +1637,7 @@ pose dx1 := dy' / (2%r * `|f x| + dy').
 pose dx2 := x - x0.
 exists (minr dx0 (minr dx1 dx2)).
 split => [/#| h ne0_h small_h].
-rewrite /differential.
+rewrite /slope.
 case (0%r < h) => [gt0_h|le0_h].
 - rewrite (integral_split f x) //=; 1,2,3:smt(continuous_has_flb_in continuous_has_fub_in).
   have ->: integral f x0 x + integral f x (x + h) - integral f x0 x = integral f x (x + h) by smt().
