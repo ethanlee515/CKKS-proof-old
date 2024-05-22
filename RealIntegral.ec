@@ -1033,24 +1033,85 @@ qed.
 
 lemma split_partition_nomem xs x0 x1 x :
   is_partition xs x0 x1 =>
+  (* extraneous but w/e *) x0 < x => x < x1 =>
   ! (x \in xs) =>
   xs = (filter (fun (a : real) => a < x) xs) ++ (filter (fun (a : real) => x < a) xs).
-proof. admitted.
+proof.
+move => [sorted_xs ?] ???.
+pose lst1 := (filter (fun (a : real) => a < x) xs).
+pose lst2 := filter (fun (a : real) => x < a) xs.
+have ?: lst1 <> [] by smt().
+have ?: lst2 <> [] by smt(mem_filter mem_last).
+have ?: sorted Real.(<) (lst1 ++ lst2).
+- apply (sorted_cat 0%r Real.( < )) => //.
+  + smt().
+  + apply sorted_filter => //.
+  + smt().
+  + apply sorted_filter => //.
+  + smt().
+  apply (ler_lt_trans x).
+  + smt(mem_last mem_filter).
+  have H: (head 0%r lst2 \in lst2) by smt().
+  rewrite mem_filter /= in H.
+  smt().
+apply (eq_sorted Real.(<)) => //; 1,2: smt().
+apply uniq_perm_eq => //.
+- apply (uniq_irreflexive_sorted Real.( < )) => //#.
+- apply (uniq_irreflexive_sorted Real.( < )) => //#.
+smt(mem_cat mem_filter).
+qed.
 
 lemma eq_nth_interval_cat1 dfl lst1 lst2 i :
   0 <= i =>
   i < size lst1 - 1 =>
   nth dfl (make_intervals (lst1 ++ lst2)) i =
   nth dfl (make_intervals lst1) i.
-proof. admitted.
+proof.
+move => ??.
+case (lst1 = []) => ?; first smt().
+case (lst2 = []) => ?; first smt(cats0).
+rewrite (nth_map 0) /=.
+- smt(size_cat size_range size_ge0).
+rewrite nth_cat.
+rewrite size_cat /=.
+rewrite nth_range /=.
+- smt(size_ge0).
+have -> /=: i < size lst1 by smt().
+rewrite (nth_map 0) /=.
+- smt(size_cat size_range size_ge0).
+rewrite nth_cat.
+have -> /=: i + 1 < size lst1 by smt().
+rewrite nth_range /#.
+qed.
 
 lemma eq_nth_interval_cat2 dfl lst1 lst1' lst2 i :
   size lst1 <= i =>
-  i < size lst1 + size lst2 =>
+  i < size lst1 + size lst2 - 1 =>
   size lst1 = size lst1' =>
   nth dfl (make_intervals (lst1 ++ lst2)) i =
   nth dfl (lst1' ++ (make_intervals lst2)) i.
-proof. admitted.
+proof.
+move => ???.
+case (lst1 = []) => ?; first smt(size_eq0 cat0s).
+have ?: lst1' <> [] by smt(size_eq0).
+case (lst2 = []) => ?; first smt().
+rewrite (nth_map 0) /=.
+- smt(size_range size_cat size_ge0).
+rewrite nth_cat.
+rewrite size_cat.
+rewrite nth_range /=.
+- smt(size_range size_cat size_ge0).
+have ->/=: !(i < size lst1) by smt().
+rewrite nth_cat.
+have ->/=:!(i + 1 < size lst1) by smt().
+rewrite nth_cat.
+have -> /=: !(i < size lst1') by smt().
+rewrite (nth_map 0) /=.
+- smt(size_range size_cat size_ge0).
+rewrite nth_range.
+- smt(size_range size_cat size_ge0).
+- smt(size_range size_cat size_ge0).
+qed.
 
 lemma cat_split_intervals_mem xs x0 x1 x :
   is_partition xs x0 x1 =>
@@ -1074,7 +1135,7 @@ case (i < size (make_intervals (split_partition_to xs x))) => /= H.
   rewrite nth_cat H /=.
   apply eq_nth_interval_cat1.
   + smt().
-  smt(size_range size_map).
+  + smt(size_range size_map).
 - have ->: filter (fun (a : real) => a < x) xs ++ [x] ++ filter ((<) x) xs =
     filter (fun (a : real) => a < x) xs ++ split_partition_from xs x.
   + rewrite /split_partition_from.
@@ -1113,7 +1174,7 @@ case (i < size (make_intervals (split_partition_to xs x))) => /= H.
       apply fact; smt(size_ge0).
     have H4: i < size (filter (fun (a : real) => a < x) xs) + size (filter ((<) x) xs).
     + by rewrite -H3.
-    have fact: forall (i a b : int), i < a + b => i < a + (1 + b) by smt().
+    have fact: forall (i a b : int), i < a + b => i < a + (1 + b) - 1 by smt().
     apply fact => //.
   + rewrite /make_intervals size_map.
     rewrite /split_partition_to size_rcons /=.
@@ -1192,7 +1253,7 @@ case (i = size (make_intervals lst1) + 1) => ?.
   + smt(size_make_intervals size_rcons).
   smt(size_range size_rcons size_make_intervals).
 (* Can't use eq_nth_interval_cat2...
- * Below is bruth force unfortunately. *)
+ * Below is brute force unfortunately. *)
 rewrite nth_cat.
 have -> /=: !(i < size (make_intervals (rcons lst1 x))).
 - smt(size_range size_rcons size_make_intervals).
