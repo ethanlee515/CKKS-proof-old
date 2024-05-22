@@ -1121,6 +1121,11 @@ case (i < size (make_intervals (split_partition_to xs x))) => /= H.
     smt(size_ge0).
 qed.
 
+lemma size_make_intervals lst :
+  lst <> [] =>
+  size (make_intervals lst) = size lst - 1.
+proof. smt(size_map size_range size_ge0). qed.
+
 lemma cat_split_intervals_nomem xs x0 x1 x :
   is_partition xs x0 x1 =>
   x0 < x => x < x1 =>
@@ -1130,12 +1135,82 @@ lemma cat_split_intervals_nomem xs x0 x1 x :
   let lst1 = filter (fun a => a < x) xs in
   let lst2 = filter (fun a => x < a) xs in
   make_intervals lst1 ++ [(last 0%r lst1, x); (x, head 0%r lst2)] ++ make_intervals lst2.
-proof. admitted.
-
-lemma size_make_intervals lst :
-  lst <> [] =>
-  size (make_intervals lst) = size lst - 1.
-proof. smt(size_map size_range size_ge0). qed.
+proof.
+move => ????.
+rewrite /split_partition_to /split_partition_from /=.
+pose lst1 := filter (fun a => a < x) xs.
+pose lst2 := filter (( < ) x) xs.
+have ?: lst1 <> [] by smt().
+have ?: lst2 <> [] by smt(mem_filter mem_last).
+apply (eq_from_nth (0%r, 0%r)); first smt(size_cat size_make_intervals size_rcons).
+move => i.
+rewrite size_cat !size_make_intervals; 1,2:smt().
+rewrite size_rcons /= => rg_i.
+case (i < size (make_intervals lst1)) => ?.
+- rewrite nth_cat.
+  have -> /=: i < size (make_intervals (rcons lst1 x)).
+  + smt(size_make_intervals size_rcons).
+  rewrite -catA nth_cat.
+  have -> /=: i < size (make_intervals lst1) by assumption.
+  rewrite (nth_map 0) /=.
+  + smt(size_range size_rcons size_make_intervals).
+  rewrite (nth_map 0) /=.
+  + smt(size_range size_rcons size_make_intervals).
+  smt(nth_rcons nth_range size_make_intervals size_rcons).
+case (i = size (make_intervals lst1)) => ?.
+- rewrite nth_cat.
+  have -> /=: i < size (make_intervals (rcons lst1 x)).
+  + smt(size_make_intervals size_rcons).
+  rewrite nth_cat.
+  have -> /=: i < size (make_intervals lst1 ++ [(last 0%r lst1, x); (x, head 0%r lst2)]).
+  + smt(size_make_intervals size_cat).
+  rewrite nth_cat /=.
+  have -> /=: !(i < size (make_intervals lst1)) by smt().
+  have -> /=: i - size (make_intervals lst1) = 0 by smt().
+  rewrite (nth_map 0) /=.
+  + smt(size_range size_rcons size_make_intervals).
+  rewrite size_rcons /=.
+  rewrite nth_range /=.
+  + smt(size_make_intervals).
+  split; first smt(nth_last size_make_intervals nth_rcons).
+  rewrite nth_rcons.
+  have -> /=: !(i + 1 < size lst1) by smt(size_make_intervals).
+  smt(size_make_intervals).
+case (i = size (make_intervals lst1) + 1) => ?.
+- rewrite nth_cat.
+  have -> /=: !(i < size (make_intervals (rcons lst1 x))).
+  + smt(size_make_intervals size_rcons).
+  rewrite nth_cat.
+  have -> /=: i < size (make_intervals lst1 ++ [(last 0%r lst1, x); (x, head 0%r lst2)]).
+  + smt(size_make_intervals size_cat).
+  rewrite nth_cat /=.
+  have -> /=: !(i < size (make_intervals lst1)) by smt().
+  have -> /=: !(i - size (make_intervals lst1) = 0) by smt().
+  rewrite (nth_map 0) /=.
+  + smt(size_range size_rcons size_make_intervals).
+  rewrite nth_range /=.
+  + smt(size_make_intervals size_rcons).
+  smt(size_range size_rcons size_make_intervals).
+(* Can't use eq_nth_interval_cat2...
+ * Below is bruth force unfortunately. *)
+rewrite nth_cat.
+have -> /=: !(i < size (make_intervals (rcons lst1 x))).
+- smt(size_range size_rcons size_make_intervals).
+rewrite nth_cat.
+have -> /=: !(i < size (make_intervals lst1 ++ [(last 0%r lst1, x); (x, head 0%r lst2)])).
+- smt(size_range size_rcons size_make_intervals size_cat).
+rewrite (nth_map 0) /=.
+- smt(size_range size_rcons size_make_intervals size_cat).
+rewrite nth_range /=.
+- smt(size_range size_rcons size_make_intervals size_cat).
+have -> /=: !(i - size (make_intervals (rcons lst1 x)) = 0).
+- smt(size_range size_rcons size_make_intervals size_cat).
+have -> /=: !(i - size (make_intervals (rcons lst1 x)) + 1 = 0).
+- smt(size_range size_rcons size_make_intervals size_cat).
+rewrite (nth_map 0) /=.
+- smt(size_range size_rcons size_make_intervals size_cat nth_range).
+smt(size_range size_rcons size_make_intervals size_cat nth_range).
+qed.
 
 lemma split_intervals_nomem xs x0 x1 x :
   is_partition xs x0 x1 =>
