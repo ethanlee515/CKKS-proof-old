@@ -1132,6 +1132,11 @@ lemma cat_split_intervals_nomem xs x0 x1 x :
   make_intervals lst1 ++ [(last 0%r lst1, x); (x, head 0%r lst2)] ++ make_intervals lst2.
 proof. admitted.
 
+lemma size_make_intervals lst :
+  lst <> [] =>
+  size (make_intervals lst) = size lst - 1.
+proof. smt(size_map size_range size_ge0). qed.
+
 lemma split_intervals_nomem xs x0 x1 x :
   is_partition xs x0 x1 =>
   x0 < x => x < x1 =>
@@ -1140,7 +1145,37 @@ lemma split_intervals_nomem xs x0 x1 x :
   let lst1 = filter (fun a => a < x) xs in
   let lst2 = filter (fun a => x < a) xs in
   make_intervals lst1 ++ [(last 0%r lst1, head 0%r lst2)] ++ make_intervals lst2.
-proof. admitted.
+proof.
+move => ???? /=.
+pose lst1 := filter (fun a => a < x) xs.
+pose lst2 := filter (Real.(<) x) xs.
+have ?: lst1 <> [] by smt().
+have ?: lst2 <> [] by smt(mem_filter mem_last).
+rewrite {1}(split_partition_nomem xs x0 x1 x) //=.
+have ->: filter (fun (a : real) => a < x) xs ++ filter ((<) x) xs = lst1 ++ lst2 by trivial.
+apply (eq_from_nth (0%r, 0%r)); first smt(size_cat size_make_intervals).
+move => i rg_i.
+case (i < size (make_intervals lst1)) => ?.
+- rewrite nth_cat.
+  have -> /=: i < size (make_intervals lst1 ++ [(last 0%r lst1, head 0%r lst2)]).
+  + smt(size_make_intervals size_cat size_ge0).
+  rewrite nth_cat.
+  have -> /=: i < size (make_intervals lst1).
+  + smt(size_make_intervals size_cat size_ge0).
+  rewrite eq_nth_interval_cat1; smt(size_make_intervals).
+case (i = size (make_intervals lst1)) => ?.
+- apply (eq_trans _ (last 0%r lst1, head 0%r lst2)); last first.
+  + rewrite nth_cat.
+    have -> /=: i < size (make_intervals lst1 ++ [(last 0%r lst1, head 0%r lst2)]) by smt(size_cat).
+    rewrite nth_cat.
+    smt(size_make_intervals).
+  rewrite /make_intervals (nth_map 0) /=.
+  + smt(size_range size_cat size_make_intervals).
+  rewrite !nth_range /=.
+  + smt(size_cat size_make_intervals).
+  smt(nth_cat size_make_intervals nth_last).
+apply eq_nth_interval_cat2; smt(size_make_intervals size_cat).
+qed.
 
 lemma lower_sum_ith_split f (x0 x1 x2 : real) :
   x0 < x1 =>
