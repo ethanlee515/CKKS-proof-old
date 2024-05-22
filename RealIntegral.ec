@@ -47,41 +47,116 @@ apply sorted_xs => i ge0_i ub_i.
 smt(size_ge0).
 qed.
 
-lemma uniq_irreflexive_sorted (e : 'a -> 'a -> bool) xs :
+lemma sorted_upper_bounded e dfl ub x xs :
   (forall (y x z : 'a), e x y => e y z => e x z) =>
-  (forall x, !(e x x)) =>
   sorted e xs =>
-  uniq xs.
-proof.
-move => ??.
-elim xs => // x xs iH.
-move => ?.
-admitted.
+  x \in xs =>
+  e (last dfl xs) ub =>
+  e x ub.
+proof. by move: x; elim xs; smt(). qed.
 
-lemma uniq_sorted_mask (e : 'a -> 'a -> bool) xs ys :
-  uniq xs =>
-  uniq ys =>
+lemma sorted_lower_bounded e dfl lb x xs :
+  (forall (y x z : 'a), e x y => e y z => e x z) =>
   sorted e xs =>
-  sorted e ys =>
-  xs = mask (map (mem xs) ys) ys.
-proof.
-admitted.
+  x \in xs =>
+  e lb (head dfl xs) =>
+  e lb x.
+proof. by move: x; elim xs; smt(). qed.
 
-lemma subseq_range xs i j :
-  sorted Int.(<) xs =>
-  i <= head i xs =>
-  last i xs < j =>
-  subseq xs (range i j).
+lemma cat_take_drop_pick (dfl : 'a) n s :
+  0 <= n =>
+  n < size s =>
+  take n s ++ [nth dfl s n] ++ drop (n + 1) s = s.
+proof. smt(cat_take_drop catA drop_nth). qed.
+
+lemma mem_mask_range m (a b i : int) :
+  a <= i =>
+  i < b =>
+  size m = (b - a) =>
+  i \in mask m (range a b) <=>
+  nth false m (i - a).
 proof.
-move => sorted_xs ge_xs_i lt_xs_j.
+move => ???.
+have ->: range a b = range a i ++ [i] ++ range (i + 1) b.
+- smt(range_cat size_range rangeS).
+rewrite -{1}(cat_take_drop_pick false (i - a) m); 1,2: smt().
+rewrite !mask_cat; 1,2: smt(size_take size_cat size_range).
+rewrite !mem_cat; smt(mem_mask mem_range).
+qed.
+
+lemma sorted_from_cons (e : 'a -> 'a -> bool) x xs :
+  sorted e (x :: xs) =>
+  sorted e xs.
+proof. by elim xs => /#. qed.
+
+lemma mem_subseq1 (x : 'a) xs :
+  x \in xs =>
+  subseq [x] xs.
+proof.
+rewrite (nthP witness).
+move => [i [rg_i H]].
 apply subseqP.
-exists (map (mem xs) (range i j)).
-split; first by rewrite size_map.
-apply (uniq_sorted_mask Int.(<)) => //.
-- apply (uniq_irreflexive_sorted Int.(<)) => /#.
-- exact range_uniq.
-- apply (sorted_from_nth 0).
-  smt(nth_range size_ge0 size_range).
+exists (nseq i false ++ [true] ++ nseq (size xs - i - 1) false).
+split; first smt(size_nseq size_cat).
+rewrite -{2}(cat_take_drop_pick witness i xs); 1,2:smt().
+rewrite !mask_cat; 1,2: smt(size_nseq size_cat size_take).
+rewrite !mask_false /#.
+qed.
+
+lemma subseq_range xs a b :
+  sorted Int.(<) xs =>
+  a <= head 0 xs =>
+  last 0 xs < b =>
+  subseq xs (range a b).
+proof.
+elim xs.
+move => ???.
+- apply subseqP.
+  exists (nseq (b - a) false).
+  smt(size_nseq size_range mask_false).
+move => x xs iH'.
+move => ???.
+case (xs = []) => ?.
+- subst => /=.
+  apply mem_subseq1.
+  smt(mem_range).
+have iH {iH'}: subseq xs (range a b).
+- by apply iH'; smt(sorted_from_cons head_behead).
+rewrite -subseqP in iH.
+case iH => m [? is_mask_xs].
+pose hx := head 0 xs.
+have ?: hx < b.
+- by apply (sorted_upper_bounded Int.(<) 0 b hx (x :: xs)) => /#.
+rewrite (range_cat hx); 1, 2: smt().
+apply subseqP.
+exists (nseq (x - a) false ++ [true] ++ nseq (hx - x - 1) false ++ drop (hx - a) m).
+split; first smt(size_cat size_nseq size_range size_drop).
+rewrite mask_cat; first smt(size_cat size_nseq size_range size_drop).
+rewrite -cat1s; congr.
+- have ->: range a hx = range a x ++ range x (x + 1) ++ range (x + 1) hx.
+  + smt(range_cat).
+  rewrite !mask_cat; 1,2: smt(size_nseq size_cat size_range).
+  rewrite !mask_false cat0s cats0.
+  by rewrite rangeS.
+rewrite is_mask_xs.
+have {1} ->: m = (take (hx - a) m ++ drop (hx - a) m).
+- by rewrite cat_take_drop.
+have {1} ->: range a b = range a hx ++ range hx b.
+- smt(range_cat).
+rewrite mask_cat; first smt(size_range size_take).
+suff: mask (take (hx - a) m) (range a hx) = [].
+- by move => ->; exact cat0s.
+apply mem_eq0 => i.
+case (i < a \/ hx <= i) => ?.
+- smt(mem_mask mem_range).
+rewrite mem_mask_range; 1,2,3:smt(size_take size_range).
+rewrite nth_take; 1,2: smt().
+suff: !(i \in xs).
+- move => ?.
+  rewrite -(mem_mask_range m a b); smt(size_range).
+suff: forall j, j \in xs => i < j by smt().
+move => j mem_j.
+apply (sorted_lower_bounded Int.(<) 0 i j xs); smt(sorted_from_cons).
 qed.
 
 lemma sorted_behead (e : 'a -> 'a -> bool) xs :
@@ -500,7 +575,6 @@ lemma continuous_at_negate f x :
   continuous_at (Real.([ - ]) \o f) x.
 proof.
 move => [[y?]?].
-print continuous_at.
 split.
 - suff: is_lim (Real.([-]) \o f) x (- f x).
   + move => ?; first by exists (-f x).
@@ -804,13 +878,64 @@ split; first apply head_split_partition_from => /#.
 by rewrite last_split_partition_from /#.
 qed.
 
+lemma split_partition_mem xs x0 x1 x :
+  is_partition xs x0 x1 =>
+  x \in xs =>
+  xs = (filter (fun (a : real) => a < x) xs) ++ [x] ++ (filter (fun (a : real) => x < a) xs).
+proof. admitted.
+
+lemma split_partition_nomem xs x0 x1 x :
+  is_partition xs x0 x1 =>
+  ! (x \in xs) =>
+  xs = (filter (fun (a : real) => a < x) xs) ++ (filter (fun (a : real) => x < a) xs).
+proof. admitted.
+
+lemma eq_nth_interval_cat1 dfl lst1 lst2 i :
+  0 <= i =>
+  i < size lst1 - 1 =>
+  nth dfl (make_intervals (lst1 ++ lst2)) i =
+  nth dfl (make_intervals lst1) i.
+proof. admitted.
+
+lemma eq_nth_interval_cat2 dfl lst1 lst1' lst2 i :
+  size lst1 <= i =>
+  i < size lst1 + size lst2 =>
+  size lst1 = size lst1' =>
+  nth dfl (make_intervals (lst1 ++ lst2)) i =
+  nth dfl (lst1' ++ (make_intervals lst2)) i.
+proof. admitted.
+
 lemma cat_split_intervals_mem xs x0 x1 x :
   is_partition xs x0 x1 =>
   x \in xs =>
   make_intervals (split_partition_to xs x) ++
   make_intervals (split_partition_from xs x)
   = make_intervals xs.
-proof. admitted.
+proof.
+move => ??.
+apply eq_sym.
+apply (eq_from_nth (0%r, 0%r)).
+- rewrite {1}(split_partition_mem xs x0 x1 x) //=.
+  rewrite !size_cat !size_map !size_cat !size_range /=.
+  rewrite !size_rcons /split_partition_from /=.
+  smt(size_ge0).
+move => i rg_i.
+rewrite {1}(split_partition_mem xs x0 x1 x) //.
+case (i < size (make_intervals (split_partition_to xs x))) => /= H.
+- have ->: filter (fun (a : real) => a < x) xs ++ [x] = split_partition_to xs x.
+  + admit.
+  rewrite nth_cat H /=.
+  apply eq_nth_interval_cat1.
+  + smt().
+  + admit.
+- have ->: filter (fun (a : real) => a < x) xs ++ [x] ++ filter ((<) x) xs =
+    filter (fun (a : real) => a < x) xs ++ split_partition_from xs x.
+  + admit.
+  apply eq_nth_interval_cat2.
+  + admit.
+  + admit.
+  + admit.
+qed.
 
 lemma cat_split_intervals_nomem xs x0 x1 x :
   is_partition xs x0 x1 =>
