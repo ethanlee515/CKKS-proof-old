@@ -597,12 +597,23 @@ lemma continuous_at_negate f x :
   continuous_at f x =>
   continuous_at (Real.([ - ]) \o f) x.
 proof.
-move => [[y?]?].
-split.
-- suff: is_lim (Real.([-]) \o f) x (- f x).
-  + move => ?; first by exists (-f x).
-  admit.
-admitted.
+move => [[y y_is_lim] lim_fx].
+suff: is_lim (Real.([-]) \o f) x (- f x).
+- move => H; split.
+  + by exists (-f x).
+  apply (lim_unique (Real.([-]) \o f) x).
+  + apply (choicebP (is_lim (Real.([-]) \o f) x) 0%r).
+    by exists (- f x).
+  rewrite /(\o) in H.
+  by rewrite /(\o).
+move => dy gt0_dy.
+have [dx ?]: exists (dx : real),
+  0%r < dx /\
+  forall (x' : real), x' <> x => `|x' - x| < dx => `|f x' - y| < dy.
+- exact y_is_lim.
+exists dx.
+smt(choicebP lim_unique).
+qed.
 
 lemma continuous_negate f :
   continuous f =>
