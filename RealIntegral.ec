@@ -1626,16 +1626,13 @@ move => order_xs continuous_f.
 suff: is_lim (slope (integral f x0) x) 0%r (f x).
 - smt(lim_unique choicebP).
 move => dy gt0_dy /=.
-pose dy' := minr dy 0.5.
-have [dx0 [gt0_dx0 [?[?[??]]]]] : exists dx, 0%r < dx /\
+have [dx [gt0_dx [?[?[??]]]]] : exists dx, 0%r < dx /\
   has_fub_in f (x - dx) (x + dx) /\
-  flub_in f (x - dx) (x + dx) < f x + dy' /\
+  flub_in f (x - dx) (x + dx) < f x + dy /\
   has_flb_in f (x - dx) (x + dx) /\ 
- f x - dy' < fglb_in f (x - dx) (x + dx).
+  f x - dy < fglb_in f (x - dx) (x + dx).
 - smt(continuous_flub_fglb).
-pose dx1 := dy' / (2%r * `|f x| + dy').
-pose dx2 := x - x0.
-exists (minr dx0 (minr dx1 dx2)).
+exists (minr dx (x - x0)).
 split => [/#| h ne0_h small_h].
 rewrite /slope.
 case (0%r < h) => [gt0_h|le0_h].
@@ -1644,12 +1641,12 @@ case (0%r < h) => [gt0_h|le0_h].
   rewrite /"`|_|".
   case (0%r <= integral f x (x + h) / h - f x) => /= _.
   + rewrite ltr_subl_addl ltr_pdivr_mulr //=.
-    apply (ltr_le_trans ((f x + dy') * h)); last first.
+    apply (ltr_le_trans ((f x + dy) * h)); last first.
     * by rewrite ler_pmul2r /#.
     apply (ler_lt_trans (flub_in f x (x + h) * (x + h - x))); last first.
     * have ->: x + h - x = h by algebra.
       rewrite ltr_pmul2r //=.
-      apply (ler_lt_trans (flub_in f (x - dx0) (x + dx0))); last by smt().
+      apply (ler_lt_trans (flub_in f (x - dx) (x + dx))); last by smt().
       by apply flub_in_subset => /#.
     apply (integral_ub f x (x + h)) => //=.
     * smt().
@@ -1657,7 +1654,7 @@ case (0%r < h) => [gt0_h|le0_h].
     * smt(has_fub_in_subset).
   + apply ltr_oppl.
     rewrite ltr_subr_addl ltr_pdivl_mulr //.
-    apply (ler_lt_trans ((f x - dy') * h)); first by smt().
+    apply (ler_lt_trans ((f x - dy) * h)); first by smt().
     apply (ltr_le_trans (fglb_in f x (x + h) * h)).
     * smt(ler_pmul2r fglb_in_subset).
     have ->: fglb_in f x (x + h) * h = fglb_in f x (x + h) * (x + h - x) by algebra.
