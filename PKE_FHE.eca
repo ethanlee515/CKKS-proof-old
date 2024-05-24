@@ -1,0 +1,98 @@
+require import AllCore List DBool.
+
+type public_key, evaluation_key, secret_key.
+type plaintext, ciphertext.
+type unary_operation = plaintext -> plaintext.
+type binary_operation = plaintext -> plaintext -> plaintext.
+
+module type Scheme = {
+  proc keygen() : public_key * evaluation_key * secret_key
+  proc encrypt(pk: public_key, m: plaintext) : ciphertext
+  proc evaluate1(evk: evaluation_key, o: unary_operation, c: ciphertext) : ciphertext
+  proc evaluate2(evk: evaluation_key, o: binary_operation, c1: ciphertext, c2: ciphertext) : ciphertext
+  proc decrypt(sk: secret_key, c : ciphertext) : plaintext
+}.
+
+module type Oracle_t = {
+  proc encrypt(m0: plaintext, m1: plaintext) : ciphertext
+  proc evaluate1(o: unary_operation, i: int) : ciphertext
+  proc evaluate2(o: binary_operation, i: int, j: int) : ciphertext
+  proc reveal(i: int) : plaintext
+}.
+
+module Oracle (S: Scheme) : Oracle_t = {
+  var b : bool
+  var pk : public_key
+  var evk : evaluation_key
+  var sk : secret_key
+  var evaluations : (plaintext * plaintext * ciphertext) list
+
+  proc init(b_in : bool, pk_in: public_key, evk_in: evaluation_key, sk_in: secret_key) = {
+    b <- b_in;
+    pk <- pk_in;
+    evk <- evk_in;
+    sk <- sk_in;
+  }
+
+  proc encrypt(m0 : plaintext, m1 : plaintext) = {
+    var c;
+    if(!b) {
+      c <@ S.encrypt(pk, m0);
+    } else {
+      c <@ S.encrypt(pk, m1);
+    }
+    evaluations <- (m0, m1, c) :: evaluations;
+    return c;
+  }
+
+  proc evaluate1(o: unary_operation, i : int) = {
+    var m0_i, m1_i, c_i;
+    var m0, m1, c;
+    (m0_i, m1_i, c_i) <- nth witness evaluations i;
+    m0 <- o m0_i;
+    m1 <- o m1_i;
+    c <@ S.evaluate1(evk, o, c_i);
+    evaluations <- (m0, m1, c) :: evaluations;
+    return c;
+  }
+
+  proc evaluate2(o: binary_operation, i : int, j : int) = {
+    var m0_i, m1_i, c_i;
+    var m0_j, m1_j, c_j;
+    var m0, m1, c;
+    (m0_i, m1_i, c_i) <- nth witness evaluations i;
+    (m0_j, m1_j, c_j) <- nth witness evaluations j;
+    m0 <- o m0_i m0_j;
+    m1 <- o m1_i m1_j;
+    c <@ S.evaluate2(evk, o, c_i, c_j);
+    evaluations <- (m0, m1, c) :: evaluations;
+    return c;
+  }
+
+  proc reveal(i: int) = {
+    var m0, m1, m, c;
+    (m0, m1, c) <- nth witness evaluations i;
+    if(m0 = m1) {
+      m <@ S.decrypt(sk, c);
+    } else {
+      m <- witness;
+    }
+    return m;
+  }
+}.
+
+module type Adversary_t(O: Oracle_t) = {
+  proc guess(pk: public_key, evk: evaluation_key) : bool
+}.
+
+module Game(S: Scheme)(A: Adversary_t) = {
+  proc main() = {
+    var b, b';
+    var pk, evk, sk;
+    b <$ {0,1};
+    (pk, evk, sk) <@ S.keygen();
+    Oracle(S).init(b, pk, evk, sk);
+    b' <@ A(Oracle(S)).guess(pk, evk);
+    return (b = b');
+  }
+}.
