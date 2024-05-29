@@ -2,8 +2,11 @@ require import AllCore List DBool.
 
 type public_key, evaluation_key, secret_key.
 type plaintext, ciphertext.
-type unary_operation = plaintext -> plaintext.
-type binary_operation = plaintext -> plaintext -> plaintext.
+type unary_operation.
+type binary_operation.
+
+op evaluate_unary : unary_operation -> plaintext -> plaintext.
+op evaluate_binary : binary_operation -> plaintext -> plaintext -> plaintext.
 
 module type Scheme = {
   proc keygen() : public_key * evaluation_key * secret_key
@@ -49,8 +52,8 @@ module Oracle (S: Scheme) : Oracle_t = {
     var m0_i, m1_i, c_i;
     var m0, m1, c;
     (m0_i, m1_i, c_i) <- nth witness evaluations i;
-    m0 <- o m0_i;
-    m1 <- o m1_i;
+    m0 <- evaluate_unary o m0_i;
+    m1 <- evaluate_unary o m1_i;
     c <@ S.evaluate1(evk, o, c_i);
     evaluations <- (m0, m1, c) :: evaluations;
     return c;
@@ -62,8 +65,8 @@ module Oracle (S: Scheme) : Oracle_t = {
     var m0, m1, c;
     (m0_i, m1_i, c_i) <- nth witness evaluations i;
     (m0_j, m1_j, c_j) <- nth witness evaluations j;
-    m0 <- o m0_i m0_j;
-    m1 <- o m1_i m1_j;
+    m0 <- evaluate_binary o m0_i m0_j;
+    m1 <- evaluate_binary o m1_i m1_j;
     c <@ S.evaluate2(evk, o, c_i, c_j);
     evaluations <- (m0, m1, c) :: evaluations;
     return c;
