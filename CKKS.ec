@@ -139,7 +139,7 @@ module CKKS : Scheme = {
       (b, a, l, nu, w) <- oget c;
       (* added noise for IND-CPA+ *)
       e <$ dpolyX (discrete_gaussian (sq_sigma * w * w));
-      result <- polymod (b + a * sk) (q * P ^ l) + e;
+      result <- polymod (b + a * sk + e) (q * P ^ l);
     }
     return result;
   }
