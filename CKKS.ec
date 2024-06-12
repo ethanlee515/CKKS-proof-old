@@ -170,18 +170,24 @@ module CKKS_no_bootstrap : Scheme = {
     return if l1 = l2 then
       Some (b, a, l1, nu1 * nu2, nu1 * w2 + nu2 * w1 + w1 * w2 + bmult l1)
       else None;
-    }
+  }
 
-  proc evaluate1(evk: evaluation_key, o: unary_operation, c: ciphertext) = {
+  proc eval_rescale(c: ciphertext, dlevel: int) = {
     var b, a, l, nu, w;
     var b', a', nu', w';
     (b, a, l, nu, w) <- oget c;
     (* rescaling *)
-    b' <$ djoinmap random_round (mkseq (fun i => b.[i]%r / (q ^ dl o)%r) n);
-    a' <$ djoinmap random_round (mkseq (fun i => a.[i]%r / (q ^ dl o)%r) n);
-    nu' <- nu / (q ^ dl o)%r;
-    w' <- w / (q ^ dl o)%r + bscale;
-    return Some (polyLX b', polyLX a', l - dl o, nu', w');
+    b' <$ djoinmap random_round (mkseq (fun i => b.[i]%r / (q ^ dlevel)%r) n);
+    a' <$ djoinmap random_round (mkseq (fun i => a.[i]%r / (q ^ dlevel)%r) n);
+    nu' <- nu / (q ^ dlevel)%r;
+    w' <- w / (q ^ dlevel)%r + bscale;
+    return Some (polyLX b', polyLX a', l - dlevel, nu', w');
+  }
+
+  proc evaluate1(evk: evaluation_key, o: unary_operation, c: ciphertext) = {
+    var result;
+    result <@ eval_rescale(c, dl o);
+    return result;
   }
 
   proc evaluate2(evk: evaluation_key, o: binary_operation, c1: ciphertext, c2: ciphertext) = {
