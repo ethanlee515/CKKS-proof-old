@@ -5,6 +5,7 @@ import Biased.
 require PKE_FHE.
 require import StdBigop.
 import Bigint.BIA.
+require import RealExp.
 
 (* poly degree *)
 op n : {int | 0 < n} as gt0_n.
@@ -44,17 +45,13 @@ proof * by smt(gt0_n).
 
 import BasePoly.
 
-type unary_operation = [ rescale of int | bootstrap ].
+type unary_operation = [ rescale of int ].
 type binary_operation = [ add | mult ].
-
-op eval_unary o (m : polyXnD1) =
-with o = rescale dl => polyLX (mkseq (fun i => m.[i] %/ q ^ dl) n)
-with o = bootstrap => m.
-
 (* can't do this imperatively later *)
-op get_dl o =
-with o = rescale dl => dl
-with o = bootstrap => 0.
+op dl o = with o = rescale i => i.
+
+op eval_unary o (m : polyXnD1) = 
+  polyLX (mkseq (fun i => m.[i] %/ q ^ (dl o)) n).
 
 op eval_binary o (m1 m2 : polyXnD1) =
 with o = add => m1 + m2
@@ -103,7 +100,11 @@ op ZO1 = mk ZO1_pdf.
 op ZO = dpolyX ZO1.
 op de = dpolyX (discrete_gaussian sq_sigma).
 
-module CKKS : Scheme = {
+op bks = 8%r * sigma * n%r / sqrt 3%r.
+op bscale = sqrt (n%r / 3%r) * (3%r + 8%r * sqrt h%r).
+op bmult (l : int) = 1%r / P%r * q%r * P%r ^ l * bks + bscale.
+
+module CKKS_no_bootstrap : Scheme = {
   proc keygen() = {
     var pk, evk, sk, a, e, b;
     var a', e', b';
@@ -144,18 +145,52 @@ module CKKS : Scheme = {
     return result;
   }
 
-  proc evaluate1(evk: evaluation_key, o: unary_operation, c: ciphertext) = {
-    var b, a, l, nu, s, dl;
-    (b, a, l, nu, s) <- oget c;
-    if(o = bootstrap) {
+  proc eval_add(c1: ciphertext, c2: ciphertext) = {
+    var a1, b1, l1, nu1, w1;
+    var a2, b2, l2, nu2, w2;
+    (b1, a1, l1, nu1, w1) <- oget c1;
+    (b2, a2, l2, nu2, w2) <- oget c2;
+    return if l1 = l2 then Some (b1 + b2, a1 + a2, l1, nu1 + nu2, w1 + w2) else None;
+  }
 
-    } else {
-      dl <- get_dl o;
+  proc eval_mult(evk: evaluation_key, c1: ciphertext, c2: ciphertext) = {
+    var a1, b1, l1, nu1, w1;
+    var a2, b2, l2, nu2, w2;
+    var d0, d1, d2;
+    var br, ar, b, a;
+    (b1, a1, l1, nu1, w1) <- oget c1;
+    (b2, a2, l2, nu2, w2) <- oget c2;
+    d0 <- b1 * b2;
+    d1 <- a1 * b2 + a2 * b1;
+    d2 <- a1 * a2;
+    br <$ djoinmap random_round (mkseq (fun i => (d2 * fst evk).[i]%r / P%r) n);
+    ar <$ djoinmap random_round (mkseq (fun i => (d2 * snd evk).[i]%r / P%r) n);
+    b <- polymod (d0 + polyLX br) (q * P ^ l1);
+    a <- polymod (d1 + polyLX ar) (q * P ^ l1);
+    return if l1 = l2 then
+      Some (b, a, l1, nu1 * nu2, nu1 * w2 + nu2 * w1 + w1 * w2 + bmult l1)
+      else None;
     }
-    return c;
+
+  proc evaluate1(evk: evaluation_key, o: unary_operation, c: ciphertext) = {
+    var b, a, l, nu, w;
+    var b', a', nu', w';
+    (b, a, l, nu, w) <- oget c;
+    (* rescaling *)
+    b' <$ djoinmap random_round (mkseq (fun i => b.[i]%r / (q ^ dl o)%r) n);
+    a' <$ djoinmap random_round (mkseq (fun i => a.[i]%r / (q ^ dl o)%r) n);
+    nu' <- nu / (q ^ dl o)%r;
+    w' <- w / (q ^ dl o)%r + bscale;
+    return Some (polyLX b', polyLX a', l - dl o, nu', w');
   }
 
   proc evaluate2(evk: evaluation_key, o: binary_operation, c1: ciphertext, c2: ciphertext) = {
-    return c1;
+    var result;
+    if(o = add) {
+      result <@ eval_add(c1, c2);
+    } else {
+      result <@ eval_mult(evk, c1, c2);
+    }
+    return result;
   }
 }.
