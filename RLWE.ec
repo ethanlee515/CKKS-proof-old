@@ -1,12 +1,6 @@
 require import AllCore Distr DBool PolyReduce.
 require import DiscreteGaussian.
-
-(* poly degree *)
-op n : {int | 0 < n} as gt0_n.
-(* modulus *)
-op q : {int | 2 <= q} as ge2_q.
-(* stdev for discrete Gaussian *)
-op sigma : { real | 0%r < sigma} as gt0_sigma.
+require import Params.
 
 clone import PolyReduceZp as PolyReduceZq with
   op n <- n,

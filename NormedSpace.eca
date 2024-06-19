@@ -1,0 +1,10 @@
+require import AllCore Group.
+
+clone include ComGroup.
+
+type t = group.
+
+op norm : t -> real.
+op distance x1 x2 = norm (x1 * inv x2).
+
+(* TODO norm axioms *)

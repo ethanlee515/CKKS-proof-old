@@ -1,0 +1,206 @@
+require import AllCore Distr List DBool.
+require NormedSpace.
+
+abstract theory HE.
+(* types of keys *)
+type pk_t, evk_t, sk_t.
+(* msgs (messages) and ct_ts *)
+type msg, ct_t.
+pred valid_ct : ct_t.
+(* supported homomorphic operations *)
+type op1.
+type op2.
+op interpret1 : op1 -> msg -> msg.
+op interpret2 : op2 -> msg -> msg -> msg.
+op keygen : (pk_t * evk_t * sk_t) distr.
+op encrypt : pk_t -> msg -> ct_t distr.
+op eval1 : evk_t -> op1 -> ct_t -> ct_t option distr.
+op eval2 : evk_t -> op2 -> ct_t -> ct_t -> ct_t option distr.
+op valid_keys pk evk sk = (pk, evk, sk) \in keygen.
+clone include NormedSpace with type group <- msg.
+end HE.
+
+abstract theory DeterministicDecryption.
+clone import HE.
+op decrypt : sk_t -> ct_t -> msg.
+
+(* -- correctness -- *)
+
+(* ciphertexts are supposed tagged with their error bounds.
+ * this reads the error bounds off the ciphertext *)
+op error_bound : ct_t -> real.
+pred is_encryption_of msg sk ct_t =
+  distance (decrypt sk ct_t) msg < error_bound ct_t.
+
+(* gate error rate: probability where evaluating a gate destroys a valid ciphertext *)
+op gate_error : real.
+
+axiom eval1_correct pk sk evk x o enc_x :
+  valid_keys pk evk sk =>
+  is_encryption_of x sk enc_x =>
+  mu (eval1 evk o enc_x) (fun enc_fx =>
+    enc_fx <> None /\ is_encryption_of (interpret1 o x) sk (oget enc_fx)) < gate_error.
+
+axiom eval2_correct pk sk evk x1 x2 o enc_x1 enc_x2 :
+  valid_keys pk evk sk =>
+  is_encryption_of x1 sk enc_x1 =>
+  is_encryption_of x2 sk enc_x2 =>
+  mu (eval2 evk o enc_x1 enc_x2) (fun enc_fx =>
+    enc_fx <> None /\ is_encryption_of (interpret2 o x1 x2) sk (oget enc_fx)) < gate_error.
+
+(* -- IND-CPA security -- *)
+(* A standard definition already exists in EC standard library.
+ * We formalize our own due to two mismatches:
+ * 1. We want to include evaluation key here,
+ *    as we take the convention that evk is separate from pk.
+ * 2. The adversary chooses messages adaptively. *)
+
+(* maximum number of encryption queries *)
+op q_enc : int.
+
+module type EncryptionOracle_t = {
+  proc encrypt(m0: msg, m1: msg) : ct_t
+}.
+
+module type INDCPA_Adversary(O: EncryptionOracle_t) = {
+  proc distinguish(pk: pk_t, evk: evk_t) : bool
+}.
+
+module EncryptionOracle : EncryptionOracle_t = {
+  var b : bool
+  var pk : pk_t
+  var num_queries : int
+
+  proc init(b_i, pk_i) = {
+    b <- b_i;
+    pk <- pk_i;
+    num_queries <- 0;
+  }
+
+  proc encrypt(m0, m1) = {
+    var result;
+    num_queries <- num_queries + 1;
+    result <$ if num_queries < q_enc then encrypt pk (if b then m0 else m1) else dnull;
+    return result;
+  }
+}.
+
+module INDCPA_Game(A: INDCPA_Adversary) = {
+  proc main() = {
+    var b, b';
+    var pk, evk, sk;
+    b <$ {0,1};
+    (pk, evk, sk) <$ keygen;
+    EncryptionOracle.init(b, pk);
+    b' <@ A(EncryptionOracle).distinguish(pk, evk);
+    return (b = b');
+  }
+}.
+
+end DeterministicDecryption.
+
+abstract theory RandomizedDecryption.
+clone include HE.
+op decrypt : sk_t -> ct_t -> msg distr.
+
+(* IND-CPA+ Game *)
+
+module type INDCPAD_Oracle_t = {
+  proc encrypt(m0: msg, m1: msg) : ct_t
+  proc evaluate1(o: op1, i: int) : ct_t option
+  proc evaluate2(o: op2, i: int, j: int) : ct_t option
+  proc reveal(i: int) : msg option
+}.
+
+(* maximum number of queries *)
+op q_evals : int.
+
+module INDCPAD_Oracle : INDCPAD_Oracle_t = {
+  var b : bool
+  var pk : pk_t
+  var evk : evk_t
+  var sk : sk_t
+  var evaluations : (msg * msg * ct_t option) list
+  var num_queries : int
+
+  proc init(b_in : bool, pk_in: pk_t, evk_in: evk_t, sk_in: sk_t) = {
+    b <- b_in;
+    pk <- pk_in;
+    evk <- evk_in;
+    sk <- sk_in;
+    num_queries <- 0;
+  }
+
+  proc encrypt(m0 : msg, m1 : msg) = {
+    var c;
+    num_queries <- num_queries + 1;
+    c <$ if size evaluations < q_evals then encrypt pk (if b then m0 else m1) else dnull;
+    evaluations <- (m0, m1, Some c) :: evaluations;
+    return c;
+  }
+
+  proc evaluate1(o: op1, i : int) = {
+    var m0_i, m1_i, c_i;
+    var m0, m1, c;
+    num_queries <- num_queries + 1;
+    (m0_i, m1_i, c_i) <- nth (witness, witness, None) evaluations i;
+    m0 <- interpret1 o m0_i;
+    m1 <- interpret1 o m1_i;
+    if(c_i <> None /\ size evaluations < q_evals) {
+      c <$ eval1 evk o (oget c_i);
+    } else {
+      c <- None;
+    }
+    evaluations <- (m0, m1, c) :: evaluations;
+    return c;
+  }
+
+  proc evaluate2(o: op2, i : int, j : int) = {
+    var m0_i, m1_i, c_i;
+    var m0_j, m1_j, c_j;
+    var m0, m1, c;
+    num_queries <- num_queries + 1;
+    (m0_i, m1_i, c_i) <- nth witness evaluations i;
+    (m0_j, m1_j, c_j) <- nth witness evaluations j;
+    m0 <- interpret2 o m0_i m0_j;
+    m1 <- interpret2 o m1_i m1_j;
+    if(c_i <> None /\ c_j <> None /\ size evaluations < q_evals) {
+      c <$ eval2 evk o (oget c_i) (oget c_j);
+    } else {
+      c <- None;
+    }
+    evaluations <- (m0, m1, c) :: evaluations;
+    return c;
+  }
+
+  proc reveal(i: int) = {
+    var m0, m1, m, c;
+    var result;
+    (m0, m1, c) <- nth witness evaluations i;
+    if(m0 = m1) {
+      m <$ decrypt sk (oget c);
+      result <- Some m;
+    } else {
+      result <- None;
+    }
+    return result;
+  }
+}.
+
+module type INDCPAD_Adversary(O: INDCPAD_Oracle_t) = {
+  proc distinguish(pk: pk_t, evk: evk_t) : bool
+}.
+
+module INDCPAD_Game(A: INDCPAD_Adversary) = {
+  proc main() = {
+    var b, b';
+    var pk, evk, sk;
+    b <$ {0,1};
+    (pk, evk, sk) <$ keygen;
+    INDCPAD_Oracle.init(b, pk, evk, sk);
+    b' <@ A(INDCPAD_Oracle).distinguish(pk, evk);
+    return (b = b');
+  }
+}.
+
+end RandomizedDecryption.
