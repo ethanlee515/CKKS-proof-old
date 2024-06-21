@@ -10,7 +10,9 @@ require ApproxFHE.
  * We will only use this module for deterministic decryption however. *)
 
 clone include ApproxFHE.
-clone include NormedSpace with type group <- msg.
+clone include NormedSpace with type t <- msg
+remove abbrev ( + )
+remove abbrev ( - ).
 
 op keygen : (pk_t * evk_t * sk_t) distr.
 op encrypt : pk_t -> msg -> ct_t distr.
@@ -19,7 +21,7 @@ op eval2 : evk_t -> op2 -> ct_t -> ct_t -> ct_t option distr.
 op decrypt : sk_t -> ct_t -> msg distr.
 
 (* boilerplate code to collect operators into an FHE scheme *)
-module M : Scheme = {
+module OpBased : Scheme = {
   proc keygen() = {
     var result;
     result <$ keygen;

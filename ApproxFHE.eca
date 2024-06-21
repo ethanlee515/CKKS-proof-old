@@ -2,7 +2,7 @@ require import AllCore Distr List DBool.
 
 (* types of keys *)
 type pk_t, evk_t, sk_t.
-(* msgs (messages) and ct_ts *)
+(* message and ciphertext types *)
 type msg, ct_t.
 (* supported homomorphic operations and their semantics *)
 type op1.
@@ -25,7 +25,7 @@ module type Scheme = {
  *    as we take the convention that evk is separate from pk.
  * 2. The adversary chooses messages adaptively.
  * 3. We have query counting support. For reasons.
- *    (Because I don't know how to prove security otherwise...) *)
+ *    (Because I don't know how to prove CKKS security otherwise...) *)
 
 module type EncryptionOracle_t = {
   proc encrypt(m0: msg, m1: msg) : ct_t
@@ -78,7 +78,7 @@ module type INDCPAD_Oracle_t = {
   proc encrypt(m0: msg, m1: msg) : ct_t
   proc evaluate1(o: op1, i: int) : ct_t option
   proc evaluate2(o: op2, i: int, j: int) : ct_t option
-  proc reveal(i: int) : msg option
+  proc decrypt(i: int) : msg option
 }.
 
 module INDCPAD_Oracle(S: Scheme) : INDCPAD_Oracle_t = {
@@ -140,7 +140,7 @@ module INDCPAD_Oracle(S: Scheme) : INDCPAD_Oracle_t = {
     return c;
   }
 
-  proc reveal(i: int) = {
+  proc decrypt(i: int) = {
     var m0, m1, m, c;
     var result;
     (m0, m1, c) <- nth (witness, witness, None) evaluations i;

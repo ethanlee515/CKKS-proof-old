@@ -1,8 +1,11 @@
 require import AllCore Group.
 
-clone include ComGroup.
+clone include ComGroup
+rename [type] "group" as "t".
 
-type t = group.
+(* We want additive notations, not multiplicative ones... *)
+abbrev ( + ) (x y : t) = x * y.
+abbrev ( - ) (x y : t) = x / y.
 
 op norm : t -> real.
 op distance x1 x2 = norm (x1 * inv x2).
