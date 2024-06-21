@@ -1,0 +1,85 @@
+require import AllCore Distr List DBool.
+require NormedSpace.
+require ApproxFHE.
+
+(* This file extends approximate FHEs by describing their correctness.
+ * Here we only care about operator-based schemes,
+ * as it is hard to axiomatize over modules.
+ *
+ * Here we assume decryption is randomized for full generality.
+ * We will only use this module for deterministic decryption however. *)
+
+clone include ApproxFHE.
+clone include NormedSpace with type group <- msg.
+
+op keygen : (pk_t * evk_t * sk_t) distr.
+op encrypt : pk_t -> msg -> ct_t distr.
+op eval1 : evk_t -> op1 -> ct_t -> ct_t option distr.
+op eval2 : evk_t -> op2 -> ct_t -> ct_t -> ct_t option distr.
+op decrypt : sk_t -> ct_t -> msg distr.
+
+(* boilerplate code to collect operators into an FHE scheme *)
+module M : Scheme = {
+  proc keygen() = {
+    var result;
+    result <$ keygen;
+    return result;
+  }
+  proc encrypt(pk, m) = {
+    var result;
+    result <$ encrypt pk m;
+    return result;
+  }
+  proc eval1(evk, o, c) = {
+    var result;
+    result <$ eval1 evk o c;
+    return result;
+  }
+  proc eval2(evk, o, c1, c2) = {
+    var result;
+    result <$ eval2 evk o c1 c2;
+    return result;
+  }
+  proc dec(sk, c) = {
+    var result;
+    result <$ decrypt sk c;
+    return result;
+  }
+}.
+
+(* -- correctness -- *)
+
+(* Correctness only has to hold for valid keys and ciphertexts.
+ * Here we write down that valid means.
+ * Our `valid_keys` predicate can be weakened:
+ * keygen only has to output valid keys with overwhelming probability. *)
+op valid_keys pk evk sk = (pk, evk, sk) \in keygen.
+pred valid_c : ct_t.
+
+(* ciphertexts are supposed tagged with their error bounds.
+ * this reads the error bounds off the ciphertext *)
+op error_bound : ct_t -> real.
+pred is_encryption_of msg sk c =
+  valid_c c /\
+  forall m, m \in decrypt sk c =>
+  distance m msg < error_bound c.
+
+(* gate error rate: probability where evaluating a gate destroys a valid ciphertext *)
+op gate_error : real.
+
+axiom encrypt_correct pk sk evk x :
+  valid_keys pk evk sk =>
+  mu (encrypt pk x) (fun enc_x => !is_encryption_of x sk enc_x) < gate_error.
+
+axiom eval1_correct pk sk evk x o enc_x :
+  valid_keys pk evk sk =>
+  is_encryption_of x sk enc_x =>
+  mu (eval1 evk o enc_x) (fun enc_fx =>
+    enc_fx <> None /\ !is_encryption_of (interp1 o x) sk (oget enc_fx)) < gate_error.
+
+axiom eval2_correct pk sk evk x1 x2 o enc_x1 enc_x2 :
+  valid_keys pk evk sk =>
+  is_encryption_of x1 sk enc_x1 =>
+  is_encryption_of x2 sk enc_x2 =>
+  mu (eval2 evk o enc_x1 enc_x2) (fun enc_fx =>
+    enc_fx <> None /\ !is_encryption_of (interp2 o x1 x2) sk (oget enc_fx)) < gate_error.
