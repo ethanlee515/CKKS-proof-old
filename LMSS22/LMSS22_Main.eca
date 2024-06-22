@@ -33,14 +33,14 @@ proof mulcC by exact Vector.ZModule.AddMonoid.addmC
 proof mul1c by exact Vector.ZModule.AddMonoid.add0m
 (* TODO prove mulcA and mulVc too *).
 
-module GaussianMechanism(S: Scheme) : Scheme = {
-  proc keygen = S.keygen
-  proc encrypt = S.encrypt
-  proc eval1 = S.eval1
-  proc eval2 = S.eval2
+module GaussianMechanism : Scheme = {
+  proc keygen = OpBased.keygen
+  proc encrypt = OpBased.encrypt
+  proc eval1 = OpBased.eval1
+  proc eval2 = OpBased.eval2
   proc dec(sk, c) = {
     var result, e, t;
-    result <@ S.dec(sk, c);
+    result <@ OpBased.dec(sk, c);
     t <- error_bound c;
     e <$ dvector (discrete_gaussian ((64 * max_queries * 2 ^ security_parameter)%r * t * t));
     return result + e;
@@ -60,7 +60,7 @@ declare module A <: INDCPAD_Adversary.
 (* The parameters are probably wrong.
  * Will fix as we get closer to this. *)
 lemma GaussianMechanismSecure q &m :
-  Pr[INDCPAD_Game(GaussianMechanism(OpBased), A).main(q) @ &m : res] <
+  Pr[INDCPAD_Game(GaussianMechanism, A).main(q) @ &m : res] <
   Pr[INDCPA_Game(OpBased, Reduction(A)).main(q) @ &m : res] + (2 ^ (- security_parameter))%r.
 proof.
 admitted.
