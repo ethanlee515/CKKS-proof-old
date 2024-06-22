@@ -10,9 +10,12 @@ type op2.
 op interp1 : op1 -> msg -> msg.
 op interp2 : op2 -> msg -> msg -> msg.
 
+(* FHE scheme.
+ * Here we allow `encrypt` to output `None` for invalid inputs.
+ * For example, CKKS plaintext always starts with modulo qL. *)
 module type Scheme = {
   proc keygen() : pk_t * evk_t * sk_t
-  proc encrypt(pk: pk_t, m: msg) : ct_t
+  proc encrypt(pk: pk_t, m: msg) : ct_t option
   proc eval1(evk: evk_t, o: op1, c: ct_t) : ct_t option
   proc eval2(evk: evk_t, o: op2, c1: ct_t, c2: ct_t) : ct_t option
   proc dec(sk: sk_t, c: ct_t) : msg
@@ -20,15 +23,16 @@ module type Scheme = {
 
 (* -- IND-CPA security -- *)
 (* A standard definition already exists in EC standard library.
- * We formalize our own due to two mismatches:
+ * We formalize our own due to some mismatches:
  * 1. We want to include evaluation key here,
  *    as we take the convention that evk is separate from pk.
- * 2. The adversary chooses messages adaptively.
- * 3. We have query counting support. For reasons.
+ * 2. As mentioned above, encryption may output `None`.
+ * 3. The adversary chooses messages adaptively.
+ * 4. We have query counting support. For reasons.
  *    (Because I don't know how to prove CKKS security otherwise...) *)
 
 module type EncryptionOracle_t = {
-  proc encrypt(m0: msg, m1: msg) : ct_t
+  proc encrypt(m0: msg, m1: msg) : ct_t option
 }.
 
 module type INDCPA_Adversary(O: EncryptionOracle_t) = {
@@ -75,7 +79,7 @@ module INDCPA_Game(S: Scheme)(A: INDCPA_Adversary) = {
  * The decryption oracle can only be called on correct evaluation results however. *)
 
 module type INDCPAD_Oracle_t = {
-  proc encrypt(m0: msg, m1: msg) : ct_t
+  proc encrypt(m0: msg, m1: msg) : ct_t option
   proc evaluate1(o: op1, i: int) : ct_t option
   proc evaluate2(o: op2, i: int, j: int) : ct_t option
   proc decrypt(i: int) : msg option
@@ -101,9 +105,9 @@ module INDCPAD_Oracle(S: Scheme) : INDCPAD_Oracle_t = {
     var c;
     if(size evaluations < max_queries) {
       c <@ S.encrypt(pk, if b then m0 else m1);
-      evaluations <- (m0, m1, Some c) :: evaluations;
+      evaluations <- (m0, m1, c) :: evaluations;
     } else {
-      c <- witness;
+      c <- None;
     }
     return c;
   }

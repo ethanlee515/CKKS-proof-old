@@ -15,7 +15,7 @@ remove abbrev ( + )
 remove abbrev ( - ).
 
 op keygen : (pk_t * evk_t * sk_t) distr.
-op encrypt : pk_t -> msg -> ct_t distr.
+op encrypt : pk_t -> msg -> ct_t option distr.
 op eval1 : evk_t -> op1 -> ct_t -> ct_t option distr.
 op eval2 : evk_t -> op2 -> ct_t -> ct_t -> ct_t option distr.
 op decrypt : sk_t -> ct_t -> msg distr.
@@ -71,7 +71,7 @@ op gate_error : real.
 
 axiom encrypt_correct pk sk evk x :
   valid_keys pk evk sk =>
-  mu (encrypt pk x) (fun enc_x => !is_encryption_of x sk enc_x) < gate_error.
+  mu (encrypt pk x) (fun enc_x => enc_x <> None /\ !is_encryption_of x sk (oget enc_x)) < gate_error.
 
 axiom eval1_correct pk sk evk x o enc_x :
   valid_keys pk evk sk =>
