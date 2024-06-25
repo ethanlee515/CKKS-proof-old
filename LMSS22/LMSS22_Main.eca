@@ -53,6 +53,7 @@ module (Reduction(A: INDCPAD_Adversary) : INDCPA_Adversary)(O: EncryptionOracle_
     return false;
   }
 }.
+
 section.
 
 declare module A <: INDCPAD_Adversary.

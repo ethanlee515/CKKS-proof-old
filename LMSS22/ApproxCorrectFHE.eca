@@ -55,13 +55,13 @@ module OpBased : Scheme = {
  * Here we write down that valid means.
  * Our `valid_keys` predicate can be weakened:
  * keygen only has to output valid keys with overwhelming probability. *)
-op valid_keys pk evk sk = (pk, evk, sk) \in keygen.
+pred valid_keys pk evk sk = (pk, evk, sk) \in keygen.
 pred valid_c : ct_t.
 
 (* ciphertexts are supposed tagged with their error bounds.
  * this reads the error bounds off the ciphertext *)
 op error_bound : ct_t -> real.
-pred is_encryption_of msg sk c =
+pred decrypts_close_to msg sk c =
   valid_c c /\
   forall m, m \in decrypt sk c =>
   distance m msg < error_bound c.
@@ -69,19 +69,23 @@ pred is_encryption_of msg sk c =
 (* gate error rate: probability where evaluating a gate destroys a valid ciphertext *)
 op gate_error : real.
 
-axiom encrypt_correct pk sk evk x :
-  valid_keys pk evk sk =>
-  mu (encrypt pk x) (fun enc_x => enc_x <> None /\ !is_encryption_of x sk (oget enc_x)) < gate_error.
+axiom encrypt_correct sk evk x :
+  phoare[OpBased.encrypt :
+    valid_keys pk evk sk /\ m = x ==>
+    res <> None /\ !decrypts_close_to x sk (oget res)
+  ] <= gate_error.
 
-axiom eval1_correct pk sk evk x o enc_x :
-  valid_keys pk evk sk =>
-  is_encryption_of x sk enc_x =>
-  mu (eval1 evk o enc_x) (fun enc_fx =>
-    enc_fx <> None /\ !is_encryption_of (interp1 o x) sk (oget enc_fx)) < gate_error.
+axiom eval1_correct pk sk o x :
+  phoare[OpBased.eval1 :
+    valid_keys pk evk sk /\
+    decrypts_close_to x sk c ==>
+    res <> None /\ !decrypts_close_to (o x) sk (oget res)
+  ] <= gate_error.
 
-axiom eval2_correct pk sk evk x1 x2 o enc_x1 enc_x2 :
-  valid_keys pk evk sk =>
-  is_encryption_of x1 sk enc_x1 =>
-  is_encryption_of x2 sk enc_x2 =>
-  mu (eval2 evk o enc_x1 enc_x2) (fun enc_fx =>
-    enc_fx <> None /\ !is_encryption_of (interp2 o x1 x2) sk (oget enc_fx)) < gate_error.
+axiom eval2_correct pk sk o x1 x2 :
+  phoare[OpBased.eval2 :
+    valid_keys pk evk sk /\
+    decrypts_close_to x1 sk c1 /\
+    decrypts_close_to x2 sk c2 ==>
+    res <> None /\ !decrypts_close_to (o x1 x2) sk (oget res)
+  ] <= gate_error.
