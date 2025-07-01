@@ -1,5 +1,7 @@
 # CKKS-proof
 
+**OUTDATED. Retrying using SSProve [here](https://github.com/ethanlee515/CKKS-Verification).**
+
 because why not
 
 ## Design choices
